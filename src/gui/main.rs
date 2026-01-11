@@ -38,7 +38,7 @@ impl AppState {
             column![
                 component::title_bar::title_bar(),
                 rule::horizontal(1),
-                component::player_controls::player_controls()
+                component::player_header::player_header()
             ]
             .spacing(4),
         )
