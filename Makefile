@@ -11,6 +11,10 @@ build-gui:
 		cp target/debug/listen-gui $(BUILD)/listen-gui && \
 		$(BUILD)/listen-gui
 
+build-gui-release:
+	cargo build --release && \
+		cp target/release/listen-gui $(BUILD)/listen-gui && \
+		$(BUILD)/listen-gui
 build-server:
 	$(CC) $(CFLAG) $(FILES_DAEMON) -o $(BUILD)/gst-server $(GSTRF) && $(BUILD)/gst-server
 

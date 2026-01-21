@@ -36,7 +36,7 @@ Implementation for gapless playback is yet to be done, but I will be implementin
 This project is at a very early stage with only a basic daemon working.
 
 For now the current plan is to implement the following:
-- GUI setup to
+- Common setup to
   1. Scan a user given folder
   2. Play the songs in a queue
   3. Add playlist management

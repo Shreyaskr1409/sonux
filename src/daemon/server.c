@@ -142,7 +142,7 @@ void *handle_client(void *arg) {
     }
 
     const char *resp;
-    resp = "SUCCESS";
+    resp = "SUCCESS\n";
     send(args->conn->sockfd, resp, strlen(resp), 0);
 
 cleanup:
