@@ -18,8 +18,12 @@ build-gui-release:
 build-server:
 	$(CC) $(CFLAG) $(FILES_DAEMON) -o $(BUILD)/gst-server $(GSTRF) && $(BUILD)/gst-server
 
-test:
-	$(CC) $(CFLAG) tests/test.c -o $(BUILD)/test $(GSTRF) && $(BUILD)/test
+test1:
+	$(CC) $(CFLAG) tests/test.c -o $(BUILD)/test1 $(GSTRF) && $(BUILD)/test1
+
+PROG_FLAGS =
+test2:
+	$(CC) $(CFLAG) src/common/common.c -o $(BUILD)/test2 $(GSTRF) && $(BUILD)/test2 $(PROG_FLAGS)
 
 clean:
 	rm -r $(BUILD)
