@@ -24,9 +24,12 @@ typedef struct __FileData {
 } FileData;
 
 typedef struct __ScanResults {
+    int    paths_ptrs_len;
+    int    paths_ptrs_itr;
     char** paths;
-    long   n;
 } ScanResults;
+
+ScanResults* newScanResults();
 
 int scanPath(char* path, ScanResults* scan_results);            // exit_status is returned
 int getAudioFiles(char* paths[], FileData* data_arr[], int n);  // exit_status is returned
