@@ -1,5 +1,6 @@
 #include "common.h"
 
+#include <ftw.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -17,4 +18,12 @@ int main(int argc, char *argv[]) {
     }
 
     exit(EXIT_SUCCESS);
+}
+
+int scanPath(char* path, ScanResults* scan_results) {
+    if (nftw(path, handle_traversal, 20, 0) == -1) {
+        perror("error while traversing given path");
+        return -1;
+    }
+    return 0;
 }
