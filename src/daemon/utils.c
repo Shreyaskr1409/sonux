@@ -23,6 +23,8 @@ program_utils *program_utils_create() {
 
     // clears sa_mask from containing garbage value
     sigemptyset(&utl_global->sa.sa_mask);
+    // both the interrupts will use same signal_handler since
+    // they are registered with same sigaction variable (&utl_global->sa)
     sigaction(SIGINT, &utl_global->sa, NULL);
     sigaction(SIGTERM, &utl_global->sa, NULL);
 

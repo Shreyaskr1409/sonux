@@ -56,6 +56,8 @@ void run_server(PlaybackController *ctl) {
 
     handle_conn(ctl, &server_conn);
 
+    // in case there was an interrupt signal, sockfd would be assigned as 0
+    // else it would be open as sockfd > 0
     if (utl_global->sockfd > 0) {
         close(server_conn.sockfd);
     }
