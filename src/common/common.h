@@ -18,19 +18,19 @@ typedef struct __AudioMetadata {
     Date  release_date;
 } AudioMetadata;
 
-typedef struct __FileData {
+typedef struct __AudioFile {
     AudioMetadata* audio_metadata;
     char*          filepath;
-} FileData;
+} AudioFile;
 
 typedef struct __ScanResults {
-    int    paths_ptrs_len;
+    int    paths_ptrs_len;  // capacity of the paths array, not the number of entries
     int    paths_ptrs_itr;
     char** paths;
 } ScanResults;
 
 ScanResults* newScanResults();
 
-int scanPath(char* path, ScanResults* scan_results);            // exit_status is returned
-int getAudioFiles(char* paths[], FileData* data_arr[], int n);  // exit_status is returned
+int scanPath(char* path, ScanResults* scan_results);             // exit_status is returned
+int getAudioFiles(char* paths[], AudioFile* data_arr[], int n);  // length of data_arr is returned
 AudioMetadata* getAudioMetadata(char* path);  // could make getVideoMetadata in future

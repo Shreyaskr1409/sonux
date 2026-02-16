@@ -1,7 +1,7 @@
 CC    = gcc
 CFLAG = -Wall -g
 BUILD = build
-GSTRF = `pkg-config --cflags --libs gstreamer-1.0`
+GSTRF = `pkg-config --cflags --libs gstreamer-1.0 taglib_c`
 
 FILES_DAEMON = src/daemon/utils.c src/daemon/controller.c src/daemon/server.c src/daemon/main.c
 FILES_GUI = src/gui/main.c
