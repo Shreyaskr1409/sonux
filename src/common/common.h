@@ -10,6 +10,7 @@ typedef struct __Date {
 } Date;
 
 typedef struct __AudioMetadata {
+    char* title;
     char* album;
     char* artist;
     char* album_artist;
@@ -24,7 +25,8 @@ typedef struct __AudioFile {
 } AudioFile;
 
 typedef struct __ScanResults {
-    int    paths_ptrs_len;  // capacity of the paths array, not the number of entries
+    int paths_ptrs_len;  // capacity of the paths array, not the number of entries
+                         // TODO: rename paths_ptrs_len to array_length
     int    paths_ptrs_itr;
     char** paths;
 } ScanResults;
@@ -33,4 +35,5 @@ ScanResults* newScanResults();
 
 int scanPath(char* path, ScanResults* scan_results);             // exit_status is returned
 int getAudioFiles(char* paths[], AudioFile* data_arr[], int n);  // length of data_arr is returned
-AudioMetadata* getAudioMetadata(char* path);  // could make getVideoMetadata in future
+int getAudioMetadata(char*          path,
+                     AudioMetadata* audio_metadata);  // could make getVideoMetadata in future

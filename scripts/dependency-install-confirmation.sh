@@ -50,8 +50,15 @@ if [ -z "$file" ]; then
     echo "STATUS: Unavailable"
     echo "      libtagc0 not installed on this system. Install the dependency to continue using this application"
 else
-    echo "STATUS: Available"
-    echo "      dependencies already installed on the system"
+    version=$(pkg-config --modversion taglib_c)
+
+    if [[ "$version" >= "2.0.0" ]]; then
+        echo "taglib_c ≥ 2.0.1 → OK"
+        echo "STATUS: Available"
+        echo "      dependencies already installed on the system"
+    else
+        echo "Error: taglib_c version $version is too old (need > 2.0.0)"
+    fi
 fi
 
 echo -e "\n"

@@ -1,33 +1,84 @@
-CC    = gcc
-CFLAG = -Wall -g
+NAME = listen-listen
+
 BUILD = build
-GSTRF = `pkg-config --cflags --libs gstreamer-1.0 taglib_c`
+SRC_DIR = src
+GUI_SRC = src/gui
+TUI_SRC = src/tui
+DAEMON_SRC = src/daemon
+COMMON_SRC = src/common
+GUI_TARGET = $(BUILD)/listen-gui
+TUI_TARGET = $(BUILD)/listen-tui
+DAEMON_TARGET = $(BUILD)/listen-daemon
+COMMON_TARGET = $(BUILD)/test-common
+GUI_TARGET_RELEASE = $(BUILD)/listen-gui-release
+OBJ_DIR = $(BUILD)/obj
 
-FILES_DAEMON = src/daemon/utils.c src/daemon/controller.c src/daemon/server.c src/daemon/main.c
-FILES_GUI = src/gui/main.c
+CC	= gcc
+CXX = g++
 
-build-gui:
-	cargo build && \
-		cp target/debug/listen-gui $(BUILD)/listen-gui && \
-		$(BUILD)/listen-gui
+CFLAGS = -Wall -g
+CXXFLAGS = $(CFLAGS) -std=c++17
+LDLIBS = `pkg-config --libs gstreamer-1.0 taglib_c`
+PKG_FLAGS = `pkg-config --cflags gstreamer-1.0 taglib_c`
 
-build-gui-release:
-	cargo build --release && \
-		cp target/release/listen-gui $(BUILD)/listen-gui && \
-		$(BUILD)/listen-gui
-build-server:
-	$(CC) $(CFLAG) $(FILES_DAEMON) -o $(BUILD)/gst-server $(GSTRF) && $(BUILD)/gst-server
+.PHONY: all debug
 
-test1:
-	$(CC) $(CFLAG) tests/test.c -o $(BUILD)/test1 $(GSTRF) && $(BUILD)/test1
+all: $(GUI_TARGET_RELEASE) $(DAEMON_TARGET)
+debug: $(GUI_TARGET) $(DAEMON_TARGET) $(COMMON_TARGET)
 
-PROG_FLAGS =
-test2:
-	$(CC) $(CFLAG) src/common/common.c -o $(BUILD)/test2 $(GSTRF) && $(BUILD)/test2 $(PROG_FLAGS)
+.PHONY: debug-gui debug-daemon
+debug-gui: $(GUI_TARGET)
+debug-daemon: $(DAEMON_TARGET)
 
+# ====================================
+# Rust builds for the GUI:
+# - debug build (for development)
+# - release build (for installation)
+
+$(GUI_TARGET_RELEASE):
+	@mkdir -p $(@D)
+	cargo build --release
+	cp target/release/listen-gui $(GUI_TARGET)
+
+$(GUI_TARGET):
+	@mkdir -p $(@D)
+	cargo build
+	cp target/debug/listen-gui $(GUI_TARGET)
+
+$(OBJ_DIR)/%.o: %.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@ $(PKG_FLAGS)
+
+$(OBJ_DIR)/%.o: %.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@ $(PKG_FLAGS)
+
+# ====================================
+# C and C++ builds for daemon
+# DAEMON_SRC is fully written in C
+# COMMON_SRC uses taglib (C++) API which is used inside C codebase
+
+D_SRCS = $(shell find $(DAEMON_SRC) -name '*.c' -or -name '*.cpp')
+D_OBJS = $(D_SRCS:%.c=$(OBJ_DIR)/%.o)
+D_DEPS = $(D_OBJS:.o=.d)
+
+$(DAEMON_TARGET): $(D_OBJS)
+	$(CXX) $(D_OBJS) -o $(DAEMON_TARGET) $(LDLIBS)
+	@echo "-> built $(DAEMON_TARGET)"
+
+# ====================================
+# Common target for testing
+
+C_SRCS = $(shell find $(COMMON_SRC) -name '*.c' -or -name '*.cpp')
+C_OBJS = $(C_SRCS:%.c=$(OBJ_DIR)/%.o)
+C_DEPS = $(C_OBJS:.o=.d)
+
+$(COMMON_TARGET): $(C_OBJS)
+	$(CXX) $(C_OBJS) -o $(COMMON_TARGET) $(LDLIBS)
+	@echo "-> built $(COMMON_TARGET)"
+
+-include $(DEPS)
+
+.PHONY: clean
 clean:
-	rm -r $(BUILD)
-	mkdir $(BUILD)
-	touch $(BUILD)/.gitkeep
-
-.PHONY: test clean
+	rm -rf $(BUILD)
