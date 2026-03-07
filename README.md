@@ -1,49 +1,210 @@
 # Listen Listen
-A TUI and GUI music player built with C and Go.
 
-This music player consists of:
-- a daemon in C which runs a server to interact with GStreamer
-- a GUI
-- a TUI (going to be) built with Go using [@charmbracelet's](https://github.com/charmbracelet) [bubbletea](https://github.com/charmbracelet/bubbletea) and [lipgloss](https://github.com/charmbracelet/lipgloss).
+A modular music player composed of a background daemon and multiple frontends.
 
-## Installation
+The architecture separates playback logic from user interfaces:
 
-1. Install using git:
-```bash
-git clone --recursive https://github.com/Shreyaskr1409/listen-listen listen-listen
-cd listen-listen/
+* **Daemon** — written in **C/C++**, communicates with **GStreamer** and manages playback.
+* **GUI** — written in **Rust**.
+* **TUI** — planned but not implemented yet.
+
+The goal is to keep the playback engine independent so that multiple clients (GUI, TUI, scripts) can interact with the same daemon.
+
+---
+
+# Architecture
+
+```
+listen-listen
+│
+├── src/
+│   ├── daemon/     # Playback daemon (C)
+│   ├── common/     # Shared logic used by daemon/tests (C/C++)
+│   ├── gui/        # Rust GUI client
+│   └── tui/        # Future TUI client
+│
+├── build/          # Generated build output
+└── Makefile
 ```
 
-2. Build the server
+### Components
+
+**Daemon**
+
+* Handles playback
+* Communicates with GStreamer
+* Will manage queue, playlists, and library scanning
+
+**GUI**
+
+* Rust-based graphical interface
+* Communicates with the daemon
+
+**TUI (planned)**
+
+* Terminal interface
+* Not implemented yet
+
+---
+
+# Dependencies
+
+## System dependencies
+
+Required for building the daemon:
+
+* gcc
+* g++
+* pkg-config
+* gstreamer-1.0
+* taglib
+
+Example (Arch Linux):
+
 ```bash
-make build-server
+sudo pacman -S gcc pkgconf gstreamer taglib
 ```
 
-3. Build the GUI (requires Clay and Raylib)
+Example (Ubuntu/Debian):
 
 ```bash
-# make build-gui (yet to be developed)
+sudo apt install build-essential pkg-config libgstreamer1.0-dev libtag1-dev
 ```
 
-4. Build the TUI (development yet to start)
+---
+
+## Rust dependencies
+
+The GUI is built using Rust, so you also need:
+
+* rust
+* cargo
+
+Install with:
+
 ```bash
-# make build-tui (yet to be developed)
+curl https://sh.rustup.rs -sSf | sh
 ```
 
-## Current Status
-The daemon setup is done enough to do basic testings with GUI.
-Implementation for gapless playback is yet to be done, but I will be implementing it very soon.
-This project is at a very early stage with only a basic daemon working.
+---
 
-For now the current plan is to implement the following:
-- Common setup to
-  1. Scan a user given folder
-  2. Play the songs in a queue
-  3. Add playlist management
-- Add gapless playback to the daemon.
-- Add scripts to test the files easily.
-- Handle cases where the URI is not a file but is available through something like HTTP.
+# Installation
 
-While dealing with different OS, I prefer to have different Makefile for different platforms instead of having
-a CMake or Meson build system. I do not want a build system to build a build system to build my project, atleast
-not at the scale at which I am at right now.
+Clone the repository:
+
+```bash
+git clone --recursive https://github.com/Shreyaskr1409/listen-listen
+cd listen-listen
+```
+
+---
+
+# Build
+
+The project uses a simple **Makefile** to orchestrate builds.
+
+## Build everything (release GUI + daemon)
+
+```bash
+make
+```
+
+This builds:
+
+```
+build/listen-gui
+build/listen-daemon
+```
+
+---
+
+## Debug build
+
+```bash
+make debug
+```
+
+Builds:
+
+```
+build/listen-gui
+build/listen-daemon
+build/test-common
+```
+
+`test-common` is useful for testing code in `src/common`.
+
+---
+
+## Build individual components
+
+### GUI (debug)
+
+```bash
+make debug-gui
+```
+
+### Daemon
+
+```bash
+make debug-daemon
+```
+
+---
+
+# Output binaries
+
+All compiled binaries are placed in:
+
+```
+build/
+```
+
+Example:
+
+```
+build/
+├── listen-daemon
+├── listen-gui
+└── test-common
+```
+
+Object files are stored under:
+
+```
+build/obj/
+```
+
+---
+
+# Cleaning the build
+
+```bash
+make clean
+```
+
+Removes the entire `build/` directory.
+
+---
+
+# Current Status
+
+The project is still in an early stage.
+
+Working:
+
+* Basic daemon build
+* GStreamer integration
+* Rust GUI build pipeline
+
+Planned next steps:
+
+* Folder scanning
+* Queue system
+* Playlist management
+* Gapless playback
+* HTTP/stream URI support
+* TUI client
+* Improved daemon-client protocol
+
+---
