@@ -1,0 +1,11 @@
+CompileFlags:
+  Add:
+    - -xc++        # Override to C++ mode—strongest flag for this
+    - -std=c++17   # Or c++20/c++23/gnu++20—match your C++ lib's needs
+
+  # Optional: Remove annoying C-only warnings, add C++-friendly ones
+  # Remove: [-Wstrict-prototypes]  # If it conflicts with C++
+  # Add: [-Wsign-conversion, -Wold-style-cast]
+
+Index:
+  Background: Build
