@@ -6,6 +6,8 @@
 #include <string.h>
 #include <taglib/tag_c.h>
 
+#include "tag/tagger.h"
+
 static ScanResults *static_scan_results;  // use newScanResults()
 
 static int handle_traversal(const char *fpath, const struct stat *sb, int tflag,
@@ -47,7 +49,7 @@ int main(int argc, char *argv[]) {
     AudioMetadata audio_metadata = {0};
     getAudioMetadata(scan_results->paths[1], &audio_metadata);
     printf("\nTitle: %s\nAlbum: %s", audio_metadata.title, audio_metadata.album);
-    printf("\nArtist: %s\nAlbum: %s\n", audio_metadata.artist, audio_metadata.album);
+    printf("\nArtist: %s\nAlbum Artist: %s\n", audio_metadata.artist, audio_metadata.album_artist);
 
     // TODO
     // make separate functions for clenup, it is becoming hard to keep
@@ -126,18 +128,32 @@ int getAudioFiles(char **paths, AudioFile **data_arr, int n) {
 }
 
 int getAudioMetadata(char *path, AudioMetadata *audio_metadata) {
-    TagLib_File *file = taglib_file_new(path);
-    if (file == NULL || !taglib_file_is_valid(file)) return 1;
-    TagLib_Tag *file_tag = taglib_file_tag(file);
+    // TagLib_File *file = taglib_file_new(path);
+    // if (file == NULL || !taglib_file_is_valid(file)) return 1;
+    // TagLib_Tag *file_tag = taglib_file_tag(file);
+    //
+    // memset(audio_metadata, 0, sizeof(*audio_metadata));
+    // audio_metadata->title = strdup(taglib_tag_title(file_tag) ?: "");
+    // audio_metadata->album = strdup(taglib_tag_album(file_tag) ?: "");
+    // audio_metadata->artist = strdup(taglib_tag_artist(file_tag) ?: "");
+    // // might need to switch from c to c++ to be able to access other metadata
+    // // audio_metadata->album_artist = strdup(taglib_property_get(file, "ALBUMARTIST")[0] ?: "");
+    //
+    // taglib_tag_free_strings();
+    // taglib_file_free(file);
+    // return 0;
 
-    memset(audio_metadata, 0, sizeof(*audio_metadata));
-    audio_metadata->title = strdup(taglib_tag_title(file_tag) ?: "");
-    audio_metadata->album = strdup(taglib_tag_album(file_tag) ?: "");
-    audio_metadata->artist = strdup(taglib_tag_artist(file_tag) ?: "");
-    // might need to switch from c to c++ to be able to access other metadata
-    // audio_metadata->album_artist = strdup(taglib_property_get(file, "ALBUMARTIST")[0] ?: "");
+    Taglib_Handler *handler = taglib_open(path);
+    if (!handler) {
+        fprintf(stderr, "Failed to open file");
+        return 1;
+    }
 
-    taglib_tag_free_strings();
-    taglib_file_free(file);
+    printf("Title:  %s\n", taglib_get_title(handler));
+    audio_metadata->title = strdup(taglib_get_title(handler) ?: "");
+    audio_metadata->album_artist = strdup(taglib_get_album_artist(handler) ?: "");
+    // audio_metadata->artist = strdup(taglib_tag_artist(file_tag) ?: "");
+
+    taglib_close(handler);
     return 0;
 }

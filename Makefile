@@ -58,7 +58,7 @@ $(OBJ_DIR)/%.o: %.cpp
 # DAEMON_SRC is fully written in C
 # COMMON_SRC uses taglib (C++) API which is used inside C codebase
 
-D_SRCS = $(shell find $(DAEMON_SRC) -name '*.c' -or -name '*.cpp')
+D_SRCS = $(shell find $(DAEMON_SRC) -name '*.c' -or -name '*.cxx')
 D_OBJS = $(D_SRCS:%.c=$(OBJ_DIR)/%.o)
 D_DEPS = $(D_OBJS:.o=.d)
 
@@ -69,7 +69,7 @@ $(DAEMON_TARGET): $(D_OBJS)
 # ====================================
 # Common target for testing
 
-C_SRCS = $(shell find $(COMMON_SRC) -name '*.c' -or -name '*.cpp')
+C_SRCS = $(shell find $(COMMON_SRC) -name '*.c' -or -name '*.cxx')
 C_OBJS = $(C_SRCS:%.c=$(OBJ_DIR)/%.o)
 C_DEPS = $(C_OBJS:.o=.d)
 
@@ -77,8 +77,14 @@ $(COMMON_TARGET): $(C_OBJS)
 	$(CXX) $(C_OBJS) -o $(COMMON_TARGET) $(LDLIBS)
 	@echo "-> built $(COMMON_TARGET)"
 
+# ====================================
+# Even when the header files are updated, the make will track it
 -include $(DEPS)
 
-.PHONY: clean
+.PHONY: clean format
+
 clean:
 	rm -rf $(BUILD)
+
+format:
+	find src -type f -name "*.c" -o -name "*.h" -o -name "*.cxx" | xargs clang-format -i
