@@ -12,16 +12,16 @@ static ScanResults *static_scan_results;  // use newScanResults()
 
 static int handle_traversal(const char *fpath, const struct stat *sb, int tflag,
                             struct FTW *ftwbuf) {
-    int *itr = &static_scan_results->paths_ptrs_itr;
+    int *itr = &static_scan_results->paths_arr_itr;
 
-    if (static_scan_results->paths_ptrs_len - 1 == *itr) {
-        static_scan_results->paths_ptrs_len = static_scan_results->paths_ptrs_len * 2;
+    if (static_scan_results->paths_arr_len - 1 == *itr) {
+        static_scan_results->paths_arr_len = static_scan_results->paths_arr_len * 2;
 
         char **new_paths = realloc(static_scan_results->paths,
-                                   static_scan_results->paths_ptrs_len * sizeof(char *));
+                                   static_scan_results->paths_arr_len * sizeof(char *));
 
         // set allocated values to 0 (new paths pointers become NULL pointers)
-        memset(new_paths + *itr, 0, (static_scan_results->paths_ptrs_len / 2) * sizeof(char *));
+        memset(new_paths + *itr, 0, (static_scan_results->paths_arr_len / 2) * sizeof(char *));
 
         static_scan_results->paths = new_paths;
     }
@@ -42,12 +42,12 @@ int main(int argc, char *argv[]) {
     }
 
     AudioFile *data_arr = NULL;
-    int n_audio_files = getAudioFiles(scan_results->paths, &data_arr, scan_results->paths_ptrs_len);
+    int n_audio_files = getAudioFiles(scan_results->paths, &data_arr, scan_results->paths_arr_itr);
     printf("Number of Audio Files: %d\n", n_audio_files);
 
     AudioMetadata audio_metadata = {0};
 
-    for (int i = 0; i < scan_results->paths_ptrs_itr; i++) {
+    for (int i = 0; i < scan_results->paths_arr_itr; i++) {
         TagLib_File *file = taglib_file_new(scan_results->paths[i]);
         if (file == NULL || !taglib_file_is_valid(file)) continue;
         TagLib_Tag *file_tag = taglib_file_tag(file);
@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
         break;
     }
 
-    for (int i = 0; i < scan_results->paths_ptrs_len; i++) {
+    for (int i = 0; i < scan_results->paths_arr_len; i++) {
         free(scan_results->paths[i]);
     }
     free(scan_results->paths);
@@ -88,9 +88,9 @@ ScanResults *newScanResults() {
     static_scan_results = malloc(sizeof(ScanResults));
     memset(static_scan_results, 0, sizeof(ScanResults));
 
-    static_scan_results->paths_ptrs_len = 32;
+    static_scan_results->paths_arr_len = 32;
 
-    char **paths_ptrs = calloc(static_scan_results->paths_ptrs_len, sizeof(char *));
+    char **paths_ptrs = calloc(static_scan_results->paths_arr_len, sizeof(char *));
     static_scan_results->paths = paths_ptrs;
 
     return static_scan_results;
@@ -101,13 +101,6 @@ int getAudioFiles(char **paths, AudioFile **data_arr, int n) {
 
     printf("\nAudio titles:\n");
     for (int i = 0; i < n; i++) {
-        // paths[i] can be NULL
-        // this is because paths_ptrs_len is the capacity of the resulting
-        // array, not the number of entries.
-        if (paths[i] == NULL) {
-            break;
-        }
-
         TagLib_File *file = taglib_file_new(paths[i]);
         // in case if path provided is a directory
         if (file == NULL || !taglib_file_is_valid(file)) {

@@ -25,9 +25,8 @@ typedef struct __AudioFile {
 } AudioFile;
 
 typedef struct __ScanResults {
-    int paths_ptrs_len;  // capacity of the paths array, not the number of entries
-                         // TODO: rename paths_ptrs_len to array_length
-    int    paths_ptrs_itr;
+    int paths_arr_len;     // capacity of the paths array, not the number of entries
+    int    paths_arr_itr;  // contains the highest index at which a path is available
     char** paths;
 } ScanResults;
 

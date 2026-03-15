@@ -1,4 +1,4 @@
-# Listen Listen
+# Sonux
 
 A modular music player composed of a background daemon and multiple frontends.
 
@@ -9,8 +9,6 @@ The architecture separates playback logic from user interfaces:
 * **TUI** — planned but not implemented yet.
 
 The goal is to keep the playback engine independent so that multiple clients (GUI, TUI, scripts) can interact with the same daemon.
-
----
 
 # Architecture
 
@@ -45,8 +43,6 @@ listen-listen
 * Terminal interface
 * Not implemented yet
 
----
-
 # Dependencies
 
 ## System dependencies
@@ -71,8 +67,6 @@ Example (Ubuntu/Debian):
 sudo apt install build-essential pkg-config libgstreamer1.0-dev libtag1-dev
 ```
 
----
-
 ## Rust dependencies
 
 The GUI is built using Rust, so you also need:
@@ -86,8 +80,6 @@ Install with:
 curl https://sh.rustup.rs -sSf | sh
 ```
 
----
-
 # Installation
 
 Clone the repository:
@@ -96,8 +88,6 @@ Clone the repository:
 git clone --recursive https://github.com/Shreyaskr1409/listen-listen
 cd listen-listen
 ```
-
----
 
 # Build
 
@@ -116,8 +106,6 @@ build/listen-gui
 build/listen-daemon
 ```
 
----
-
 ## Debug build
 
 ```bash
@@ -134,8 +122,6 @@ build/test-common
 
 `test-common` is useful for testing code in `src/common`.
 
----
-
 ## Build individual components
 
 ### GUI (debug)
@@ -149,8 +135,6 @@ make debug-gui
 ```bash
 make debug-daemon
 ```
-
----
 
 # Output binaries
 
@@ -175,8 +159,6 @@ Object files are stored under:
 build/obj/
 ```
 
----
-
 # Cleaning the build
 
 ```bash
@@ -184,8 +166,6 @@ make clean
 ```
 
 Removes the entire `build/` directory.
-
----
 
 # Current Status
 
@@ -206,5 +186,3 @@ Planned next steps:
 * HTTP/stream URI support
 * TUI client
 * Improved daemon-client protocol
-
----
