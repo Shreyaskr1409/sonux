@@ -15,7 +15,7 @@ typedef struct __AudioMetadata {
     char* artist;
     char* album_artist;
     int   track_no;
-    int   disk_no;
+    int   disc_no;
     Date  release_date;
 } AudioMetadata;
 

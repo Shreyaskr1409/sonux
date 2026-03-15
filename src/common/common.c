@@ -13,11 +13,20 @@ static ScanResults *static_scan_results;  // use newScanResults()
 static int handle_traversal(const char *fpath, const struct stat *sb, int tflag,
                             struct FTW *ftwbuf) {
     int *itr = &static_scan_results->paths_ptrs_itr;
+
     if (static_scan_results->paths_ptrs_len - 1 == *itr) {
         static_scan_results->paths_ptrs_len = static_scan_results->paths_ptrs_len * 2;
-        static_scan_results = realloc(static_scan_results, static_scan_results->paths_ptrs_len);
+
+        char **new_paths = realloc(static_scan_results->paths,
+                                   static_scan_results->paths_ptrs_len * sizeof(char *));
+
+        // set allocated values to 0 (new paths pointers become NULL pointers)
+        memset(new_paths + *itr, 0, (static_scan_results->paths_ptrs_len / 2) * sizeof(char *));
+
+        static_scan_results->paths = new_paths;
     }
 
+    printf("%d - %s\n", *itr, fpath);
     static_scan_results->paths[*itr] = strdup(fpath);  // fpath is temporary
                                                        // needs to be freed later on
     *itr = *itr + 1;
@@ -30,16 +39,6 @@ int main(int argc, char *argv[]) {
     ScanResults *scan_results = newScanResults();
     if (argc > 1) {
         scanPath(argv[1], scan_results);
-
-        for (int i = 0; i < scan_results->paths_ptrs_len; i++) {
-            if (scan_results->paths[i] == NULL) {  // paths[i] can be NULL
-                                                   // this is because paths_ptrs_len
-                                                   // is the capacity of the resulting
-                                                   // array, not the number of entries
-                break;
-            }
-            printf("%s\n", scan_results->paths[i]);
-        }
     }
 
     AudioFile *data_arr = NULL;
@@ -47,15 +46,26 @@ int main(int argc, char *argv[]) {
     printf("Number of Audio Files: %d\n", n_audio_files);
 
     AudioMetadata audio_metadata = {0};
-    getAudioMetadata(scan_results->paths[1], &audio_metadata);
-    printf("\nTitle: %s\nAlbum: %s", audio_metadata.title, audio_metadata.album);
-    printf("\nArtist: %s\nAlbum Artist: %s\n", audio_metadata.artist, audio_metadata.album_artist);
 
-    // TODO
-    // make separate functions for clenup, it is becoming hard to keep
-    // track of all the pointers to be freed
-    //
-    // also finish up the getAudioFiles and getAudioMetadata functions
+    for (int i = 0; i < scan_results->paths_ptrs_itr; i++) {
+        TagLib_File *file = taglib_file_new(scan_results->paths[i]);
+        if (file == NULL || !taglib_file_is_valid(file)) continue;
+        TagLib_Tag *file_tag = taglib_file_tag(file);
+
+        char *audio_title = taglib_tag_title(file_tag);
+        if (audio_title == NULL) {
+            taglib_file_free(file);
+            continue;
+        }
+
+        printf("\nPath: %s\n", scan_results->paths[i]);
+        getAudioMetadata(scan_results->paths[i], &audio_metadata);
+        printf("\nDisc No: %d\nTrack No: %d", audio_metadata.disc_no, audio_metadata.track_no);
+        printf("\nTitle: %s\nAlbum: %s", audio_metadata.title, audio_metadata.album);
+        printf("\nArtist: %s\nAlbum Artist: %s\n", audio_metadata.artist,
+               audio_metadata.album_artist);
+        break;
+    }
 
     for (int i = 0; i < scan_results->paths_ptrs_len; i++) {
         free(scan_results->paths[i]);
@@ -128,31 +138,18 @@ int getAudioFiles(char **paths, AudioFile **data_arr, int n) {
 }
 
 int getAudioMetadata(char *path, AudioMetadata *audio_metadata) {
-    // TagLib_File *file = taglib_file_new(path);
-    // if (file == NULL || !taglib_file_is_valid(file)) return 1;
-    // TagLib_Tag *file_tag = taglib_file_tag(file);
-    //
-    // memset(audio_metadata, 0, sizeof(*audio_metadata));
-    // audio_metadata->title = strdup(taglib_tag_title(file_tag) ?: "");
-    // audio_metadata->album = strdup(taglib_tag_album(file_tag) ?: "");
-    // audio_metadata->artist = strdup(taglib_tag_artist(file_tag) ?: "");
-    // // might need to switch from c to c++ to be able to access other metadata
-    // // audio_metadata->album_artist = strdup(taglib_property_get(file, "ALBUMARTIST")[0] ?: "");
-    //
-    // taglib_tag_free_strings();
-    // taglib_file_free(file);
-    // return 0;
-
     Taglib_Handler *handler = taglib_open(path);
     if (!handler) {
         fprintf(stderr, "Failed to open file");
         return 1;
     }
 
-    printf("Title:  %s\n", taglib_get_title(handler));
     audio_metadata->title = strdup(taglib_get_title(handler) ?: "");
     audio_metadata->album_artist = strdup(taglib_get_album_artist(handler) ?: "");
-    // audio_metadata->artist = strdup(taglib_tag_artist(file_tag) ?: "");
+    audio_metadata->artist = strdup(taglib_get_artist(handler) ?: "");
+    audio_metadata->album = strdup(taglib_get_album(handler) ?: "");
+    audio_metadata->track_no = taglib_get_track_no(handler);
+    audio_metadata->disc_no = taglib_get_disc_no(handler);
 
     taglib_close(handler);
     return 0;
