@@ -5,10 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <taglib/tag_c.h>
+#include <time.h>
 
 #include "tag/tagger.h"
 
 static ScanResults *static_scan_results;  // use newScanResults()
+FILE *logfile;
 
 static int handle_traversal(const char *fpath, const struct stat *sb, int tflag,
                             struct FTW *ftwbuf) {
@@ -26,7 +28,8 @@ static int handle_traversal(const char *fpath, const struct stat *sb, int tflag,
         static_scan_results->paths = new_paths;
     }
 
-    printf("%d - %s\n", *itr, fpath);
+    fprintf(logfile, "%d - %s\n", *itr, fpath);
+    fflush(logfile);
     static_scan_results->paths[*itr] = strdup(fpath);  // fpath is temporary
                                                        // needs to be freed later on
     *itr = *itr + 1;
@@ -34,6 +37,12 @@ static int handle_traversal(const char *fpath, const struct stat *sb, int tflag,
 }
 
 int main(int argc, char *argv[]) {
+    logfile = fopen("scan.log", "a");
+    if (!logfile) exit(EXIT_FAILURE);
+
+    time_t now = time(NULL);
+    fprintf(logfile, "\n%s%s\n", ctime(&now), "Logging starts");
+
     printf("\nScan Results:\n");
 
     ScanResults *scan_results = newScanResults();
@@ -72,6 +81,7 @@ int main(int argc, char *argv[]) {
     }
     free(scan_results->paths);
     free(scan_results);
+    fclose(logfile);
 
     exit(EXIT_SUCCESS);
 }

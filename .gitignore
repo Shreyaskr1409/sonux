@@ -2,8 +2,7 @@
 .vscode
 build/
 
-deps/lib/
-
+*.log
 
 # Added by cargo
 
