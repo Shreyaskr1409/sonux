@@ -10,6 +10,9 @@
 #include <TargetConditionals.h>
 #endif
 
+// server_routine launches server into a separate thread. This thread closes at
+// a Fatal signal and closes GRACEFULLY when a graceful shutdown is asked for
+// through Interrupts.
 void *server_routine(void *arg) {
     printf("Server routine executing in a separate thread...\n");
 
@@ -19,6 +22,9 @@ void *server_routine(void *arg) {
     return NULL;
 }
 
+// Main entry point function. The arguments passed to the binary will be passed
+// down to the gstreamer initializer function. Gstreamer flags can be directly
+// passed through the binary.
 int main(int argc, char *argv[]) {
     printf("Hello World\n");
 

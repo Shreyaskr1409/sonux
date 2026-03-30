@@ -11,6 +11,11 @@
 #include "gst/gstobject.h"
 #include "gst/gsturi.h"
 
+/*
+Creates and returns a new GStreamer "playbin" element.
+This is the main high-level playback element used for audio playback.
+The element is initialized but not yet configured with any URI or state.
+*/
 GstElement *create_idle_playbin() {
     GstElement *playbin;  // made a local variable because it will dynamically allocated
 
@@ -23,6 +28,14 @@ GstElement *create_idle_playbin() {
     return playbin;
 }
 
+/*
+Initializes the PlaybackController structure.
+- Resets all fields to zero
+- Creates a playbin instance for playback
+- Initializes synchronization primitives (mutex and condition variable)
+- Retrieves the GStreamer bus for message handling
+- Sets default values for URIs and callbacks
+*/
 void playback_controller_init(PlaybackController *ctl) {
     memset(ctl, 0, sizeof(*ctl));
 
@@ -44,6 +57,12 @@ void playback_controller_init(PlaybackController *ctl) {
     ctl->error_cb = NULL;
 }
 
+/*
+Cleans up resources associated with the PlaybackController.
+- Unrefs GStreamer objects (playbin and bus)
+- Clears mutex and condition variable
+Should be called before destroying the controller to avoid memory/resource leaks.
+*/
 void playback_controller_clear(PlaybackController *ctl) {
     if (!ctl) return;
 
@@ -55,6 +74,14 @@ void playback_controller_clear(PlaybackController *ctl) {
     g_cond_clear(&ctl->cond);
 }
 
+/*
+Starts playback of a given track.
+- Accepts either a file path or "DEFAULT" keyword
+- Validates file existence using stat()
+- Converts file path to a GStreamer-compatible URI
+- Resets playbin to NULL state before setting new URI
+- Transitions playbin to PLAYING state to begin playback
+*/
 void controller_play_track(PlaybackController *ctl, char *arg) {
     struct stat st;
     char       *uri = NULL;
@@ -81,10 +108,12 @@ void controller_play_track(PlaybackController *ctl, char *arg) {
     gst_element_set_state(ctl->playbin, GST_STATE_PLAYING);
 }
 
+// Pauses the currently playing track by setting playbin to PAUSED state.
 void controller_pause_track(PlaybackController *ctl) {
     gst_element_set_state(ctl->playbin, GST_STATE_PAUSED);
 }
 
+// Resumes playback of the current track by setting playbin back to PLAYING state.
 void controller_resume_track(PlaybackController *ctl) {
     gst_element_set_state(ctl->playbin, GST_STATE_PLAYING);
 }

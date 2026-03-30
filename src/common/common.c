@@ -9,9 +9,16 @@
 
 #include "tag/tagger.h"
 
-static ScanResults *static_scan_results;  // use newScanResults()
-static FILE        *logfile;
+// Static variables to this file to be declared below:
+static PathScanResults *static_scan_results;  // use newScanResults()
+static FILE            *logfile;
 
+/*
+This method handles directory traversal as per the template which <ftw.h> requires.
+While stat* sb is not being used currently, it is an important asset for determining
+the stats such as file_size of the file, as well as date of addition to the library
+or database (which I will be using later on as the project progresses).
+*/
 static int handle_traversal(const char *fpath, const struct stat *sb, int tflag,
                             struct FTW *ftwbuf) {
     int *itr = &static_scan_results->paths_arr_itr;
@@ -48,13 +55,12 @@ This will be removed later on when this module will be complete. For now what th
 int main(int argc, char *argv[]) {
     logfile = fopen("scan.log", "a");
     if (!logfile) exit(EXIT_FAILURE);
-
     time_t now = time(NULL);
     fprintf(logfile, "\n%s%s\n", ctime(&now), "Logging starts");
 
     printf("\nScan Results:\n");
 
-    ScanResults *scan_results = newScanResults();
+    PathScanResults *scan_results = newPathScanResults();
     if (argc > 1) {
         scanPath(argv[1], scan_results);
     }
@@ -66,17 +72,15 @@ int main(int argc, char *argv[]) {
     printf("Number of Paths scanned: %d\n", scan_results->paths_arr_itr);
     printf("Number of Audio Files: %d\n", n_audio_files);
 
+    // Scan output logging:
     for (int i = 0; i < n_audio_files; i++) {
         AudioFile *f = &data_arr[i];
 
         printf("\n%d.", i + 1);
         printf("\nPath: %s\n", f->filepath);
-
         printf("\nDisc No: %d\nTrack No: %d", f->audio_metadata->disc_no,
                f->audio_metadata->track_no);
-
         printf("\nTitle: %s\nAlbum: %s", f->audio_metadata->title, f->audio_metadata->album);
-
         printf("\nArtist: %s\nAlbum Artist: %s\n", f->audio_metadata->artist,
                f->audio_metadata->album_artist);
     }
@@ -91,17 +95,27 @@ int main(int argc, char *argv[]) {
     exit(EXIT_SUCCESS);
 }
 
-int scanPath(char *path, ScanResults *static_scan_results) {
-    if (nftw(path, handle_traversal, 20, 0) == -1) {
+/*
+scanPath() uses nftw() to traverse through the provided directory according to the
+handle_traversal() function.
+More information on handle_traversal() is provided before code for the function.
+*/
+int scanPath(char *dir_path, PathScanResults *path_scan_results) {
+    if (nftw(dir_path, handle_traversal, 20, 0) == -1) {
         perror("error while traversing given path");
         return -1;
     }
     return 0;
 }
 
-ScanResults *newScanResults() {
-    static_scan_results = malloc(sizeof(ScanResults));
-    memset(static_scan_results, 0, sizeof(ScanResults));
+/*
+newPathScanResults is a simple allocator for initializing a PathScanResults struct.
+This became as a requirement because I left too many pointers inside the struct which
+needed initialization before they come into use.
+*/
+PathScanResults *newPathScanResults() {
+    static_scan_results = malloc(sizeof(PathScanResults));
+    memset(static_scan_results, 0, sizeof(PathScanResults));
 
     static_scan_results->paths_arr_len = 32;
 
@@ -111,6 +125,15 @@ ScanResults *newScanResults() {
     return static_scan_results;
 }
 
+/*
+getAudioFiles() filters out actual AudioFiles on basis of (whether they have a title or not).
+While this is not an ideal filteration criteria, it works for me since I want to handle well
+tagged music library. **data_arr (pointer to array) needs to be passed as a NULL pointer since
+the actual address will be dynamically allocated inside this struct.
+
+The resizing of data_arr happens dynamically by initial capacity of 32 and multiplication factor
+of 2.
+*/
 int getAudioFiles(char **paths, AudioFile **data_arr, int n) {
     int count = 0;
 
@@ -127,6 +150,8 @@ int getAudioFiles(char **paths, AudioFile **data_arr, int n) {
         TagLib_Tag *file_tag = taglib_file_tag(file);
 
         // check if the file is an audio file
+        // for now, just verification for whether the file
+        // has audio_title field or not, will work.
         char *audio_title = taglib_tag_title(file_tag);
         if (audio_title == NULL) {
             taglib_file_free(file);
@@ -141,7 +166,6 @@ int getAudioFiles(char **paths, AudioFile **data_arr, int n) {
         (*data_arr)[count].filepath = strdup(paths[i]);
         (*data_arr)[count].audio_metadata = malloc(sizeof(AudioMetadata));
 
-        memset((*data_arr)[count].audio_metadata, 0, sizeof(AudioMetadata));
         getAudioMetadata(paths[i], (*data_arr)[count].audio_metadata);
 
         count++;
@@ -154,12 +178,22 @@ int getAudioFiles(char **paths, AudioFile **data_arr, int n) {
     return count;
 }
 
+/*
+getAudioMetadata() fills up audio_metadata struct (assuming it is already allocated) with
+audio metadata from TagLib C wrapper over the C++ API. This was done because TagLib's official
+C wrapper, atleast the version I have installed, does not provide support for accessing property
+maps. C++ on the other hand, has the support. The wrappers can be found in the "./tag/" subdirectory
+relative to the current file directory.
+
+If any property is not found, then it will be either filled as a blank string or 0;
+*/
 int getAudioMetadata(char *path, AudioMetadata *audio_metadata) {
     Taglib_Handler *handler = taglib_open(path);
     if (!handler) {
         fprintf(stderr, "Failed to open file");
         return 1;
     }
+    memset(audio_metadata, 0, sizeof(*audio_metadata));
 
     audio_metadata->title = strdup(taglib_get_title(handler) ?: "");
     audio_metadata->album_artist = strdup(taglib_get_album_artist(handler) ?: "");

@@ -8,6 +8,12 @@
 
 program_utils *utl_global = NULL;
 
+/*
+Creates program utils while initializing the signal and assigns it to
+the handler. Any customization to what kind of signals to be handled
+needs to be made inside the function. Currently, just SIGINT and SIGTERM
+are registered.
+*/
 program_utils *program_utils_create() {
     utl_global = (program_utils *)calloc(1, sizeof(*utl_global));
     if (!utl_global) return NULL;
@@ -31,6 +37,11 @@ program_utils *program_utils_create() {
     return utl_global;
 }
 
+/*
+Signal handler for program_utils->sa. Changes shutdown_req from 0 to 1.
+This makes the server to stop listening to any new connections. As well as
+closes the sockets leading to program shutdown.
+*/
 void handle_sig(int sig) {
     printf("    => Shutdown signal received.\n");
     utl_global->shutdown_req = 1;
@@ -43,6 +54,7 @@ void handle_sig(int sig) {
     }
 }
 
+// frees resources created by program_utils_create
 void program_utils_clear(program_utils *utl) {
     free(utl);
 }

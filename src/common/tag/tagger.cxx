@@ -9,6 +9,9 @@
 #include <cstdlib>
 #include <string>
 
+// TagLib_Handler stores TagLib related info or standard audio metadata for the
+// files (for now, is redundant and can be either useful in future or removed
+// from the struct).
 struct Taglib_Handler {
     TagLib::FileRef*    ref;
     TagLib::PropertyMap props;
@@ -20,6 +23,10 @@ struct Taglib_Handler {
     int                 disc_no;
 };
 
+// Opens a file to create a TagLib_Handler which stores TagLib related info or
+// standard audio metadata for the files (for now, is redundant and can be either
+// useful in future or removed from the struct). This method also initializes the
+// property maps for the audio files.
 Taglib_Handler* taglib_open(const char* path) {
     Taglib_Handler* handler = new Taglib_Handler();
     handler->ref = new TagLib::FileRef(path);
@@ -55,6 +62,7 @@ const char* taglib_get_album(Taglib_Handler* handler) {
     return handler->album.c_str();
 }
 
+// No direct taglib implementation exists, thus uses PropertyMap
 const char* taglib_get_album_artist(Taglib_Handler* handler) {
     handler->props = handler->ref->file()->properties();
 
@@ -70,6 +78,7 @@ int taglib_get_track_no(Taglib_Handler* handler) {
     return handler->track_no;
 }
 
+// No direct taglib implementation exists, thus uses PropertyMap
 int taglib_get_disc_no(Taglib_Handler* handler) {
     handler->props = handler->ref->file()->properties();
 

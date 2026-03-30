@@ -12,19 +12,31 @@
 #include "controller.h"
 #include "utils.h"
 
+// Represents a TCP connection (server or client).
+// Holds socket file descriptor and address info required for accept()/send()/recv().
 typedef struct __Connection {
     int                sockfd;
     struct sockaddr_in addr;  // comes from netinet/in.h (requires sys/socket.h)
     socklen_t          addr_len;
 } Connection;
 
+// Wrapper struct used to pass multiple arguments to the client handler thread.
+// Contains the accepted client connection and the playback controller instance.
 typedef struct __HandleClientArgs {
     Connection         *conn;
     PlaybackController *ctl;
 } HandleClientArgs;
 
+// Static variables or forward declarations to this file to be declared below:
 static void handle_conn(PlaybackController *ctl, Connection *server_conn);
 
+/*
+Initializes and runs the TCP server.
+- Creates socket, sets reuse options, binds to PORT
+- Stores socket globally for shutdown handling
+- Delegates connection handling to handle_conn()
+- Cleans up socket on shutdown
+*/
 void run_server(PlaybackController *ctl) {
     Connection server_conn;
 
@@ -64,6 +76,13 @@ void run_server(PlaybackController *ctl) {
     return;
 }
 
+/*
+Main server loop that listens for and accepts incoming client connections.
+- Calls listen() and blocks on accept()
+- For each client, allocates connection struct
+- Spawns a detached worker thread (handle_client) per connection
+- Continues until shutdown flag is set
+*/
 static void handle_conn(PlaybackController *ctl, Connection *server_conn) {
     // Should first prepare the gst pipeline, put it in the PAUSED state
     // and then listen to connections
@@ -106,6 +125,14 @@ static void handle_conn(PlaybackController *ctl, Connection *server_conn) {
     }
 }
 
+/*
+Worker thread function to handle a single client request.
+- Receives command from client (PLAY, PAUSE, RESUME)
+- Parses input using strtok_r
+- Invokes appropriate controller action
+- Sends response back to client
+- Cleans up connection and allocated resources
+*/
 void *handle_client(void *arg) {
     HandleClientArgs *args = (HandleClientArgs *)arg;
 

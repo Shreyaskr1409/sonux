@@ -21,20 +21,21 @@ typedef struct __AudioMetadata {
 } AudioMetadata;
 
 typedef struct __AudioFile {
-    AudioMetadata* audio_metadata;
-    char*          filepath;
+    AudioMetadata* audio_metadata;  // anything like this would be a pointer because
+                                    // i want to be able to change these things during runtime
+    char* filepath;
 } AudioFile;
 
-typedef struct __ScanResults {
+typedef struct __PathScanResults {
     int    paths_arr_len;  // capacity of the paths array, not the number of entries
     int    paths_arr_itr;  // contains the highest index at which a path is available
     char** paths;
     bool   isAudioFile;
-} ScanResults;
+} PathScanResults;
 
-ScanResults* newScanResults();
+PathScanResults* newPathScanResults();
 
-int scanPath(char* path, ScanResults* scan_results);             // exit_status is returned
-int getAudioFiles(char* paths[], AudioFile* data_arr[], int n);  // length of data_arr is returned
+int scanPath(char* dir_path, PathScanResults* path_scan_results);  // exit_status is returned
+int getAudioFiles(char* paths[], AudioFile* data_arr[], int n);    // length of data_arr is returned
 int getAudioMetadata(char*          path,
                      AudioMetadata* audio_metadata);  // could make getVideoMetadata in future
