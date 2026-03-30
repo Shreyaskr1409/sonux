@@ -2,6 +2,7 @@
 
 #define _XOPEN_SOURCE 700
 #include <ftw.h>
+#include <stdbool.h>
 
 typedef struct __Date {
     int day;
@@ -25,9 +26,10 @@ typedef struct __AudioFile {
 } AudioFile;
 
 typedef struct __ScanResults {
-    int paths_arr_len;     // capacity of the paths array, not the number of entries
+    int    paths_arr_len;  // capacity of the paths array, not the number of entries
     int    paths_arr_itr;  // contains the highest index at which a path is available
     char** paths;
+    bool   isAudioFile;
 } ScanResults;
 
 ScanResults* newScanResults();

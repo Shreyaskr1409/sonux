@@ -10,7 +10,7 @@
 #include "tag/tagger.h"
 
 static ScanResults *static_scan_results;  // use newScanResults()
-FILE *logfile;
+static FILE        *logfile;
 
 static int handle_traversal(const char *fpath, const struct stat *sb, int tflag,
                             struct FTW *ftwbuf) {
@@ -36,6 +36,15 @@ static int handle_traversal(const char *fpath, const struct stat *sb, int tflag,
     return 0;
 }
 
+/*
+Main function for testing out common utilities.
+
+This will be removed later on when this module will be complete. For now what this module does is:
+- Scans for all possible paths inside a directory provided in args
+- Logs out all traversed paths in a scan.log file
+- From the array of traversed path, AudioFile(s) are extracted
+- AudioFile will contain the path as well as the metadata
+*/
 int main(int argc, char *argv[]) {
     logfile = fopen("scan.log", "a");
     if (!logfile) exit(EXIT_FAILURE);
@@ -52,28 +61,24 @@ int main(int argc, char *argv[]) {
 
     AudioFile *data_arr = NULL;
     int n_audio_files = getAudioFiles(scan_results->paths, &data_arr, scan_results->paths_arr_itr);
+
+    printf("\nScan results:\n");
+    printf("Number of Paths scanned: %d\n", scan_results->paths_arr_itr);
     printf("Number of Audio Files: %d\n", n_audio_files);
 
-    AudioMetadata audio_metadata = {0};
+    for (int i = 0; i < n_audio_files; i++) {
+        AudioFile *f = &data_arr[i];
 
-    for (int i = 0; i < scan_results->paths_arr_itr; i++) {
-        TagLib_File *file = taglib_file_new(scan_results->paths[i]);
-        if (file == NULL || !taglib_file_is_valid(file)) continue;
-        TagLib_Tag *file_tag = taglib_file_tag(file);
+        printf("\n%d.", i + 1);
+        printf("\nPath: %s\n", f->filepath);
 
-        char *audio_title = taglib_tag_title(file_tag);
-        if (audio_title == NULL) {
-            taglib_file_free(file);
-            continue;
-        }
+        printf("\nDisc No: %d\nTrack No: %d", f->audio_metadata->disc_no,
+               f->audio_metadata->track_no);
 
-        printf("\nPath: %s\n", scan_results->paths[i]);
-        getAudioMetadata(scan_results->paths[i], &audio_metadata);
-        printf("\nDisc No: %d\nTrack No: %d", audio_metadata.disc_no, audio_metadata.track_no);
-        printf("\nTitle: %s\nAlbum: %s", audio_metadata.title, audio_metadata.album);
-        printf("\nArtist: %s\nAlbum Artist: %s\n", audio_metadata.artist,
-               audio_metadata.album_artist);
-        break;
+        printf("\nTitle: %s\nAlbum: %s", f->audio_metadata->title, f->audio_metadata->album);
+
+        printf("\nArtist: %s\nAlbum Artist: %s\n", f->audio_metadata->artist,
+               f->audio_metadata->album_artist);
     }
 
     for (int i = 0; i < scan_results->paths_arr_len; i++) {
@@ -107,7 +112,10 @@ ScanResults *newScanResults() {
 }
 
 int getAudioFiles(char **paths, AudioFile **data_arr, int n) {
-    int l = 0;
+    int count = 0;
+
+    int capacity = 32;
+    *data_arr = malloc(capacity * sizeof(AudioFile));
 
     printf("\nAudio titles:\n");
     for (int i = 0; i < n; i++) {
@@ -125,19 +133,25 @@ int getAudioFiles(char **paths, AudioFile **data_arr, int n) {
             continue;
         }
 
-        l++;
+        if (count >= capacity) {
+            capacity *= 2;
+            *data_arr = realloc(*data_arr, capacity * sizeof(AudioFile));
+        }
+
+        (*data_arr)[count].filepath = strdup(paths[i]);
+        (*data_arr)[count].audio_metadata = malloc(sizeof(AudioMetadata));
+
+        memset((*data_arr)[count].audio_metadata, 0, sizeof(AudioMetadata));
+        getAudioMetadata(paths[i], (*data_arr)[count].audio_metadata);
+
+        count++;
         printf("%s\n", audio_title);
-        // TODO
-        // Fill in the AudioFile struct with the paths
-        // keep metadata as NULL for now, that will be filled
-        // by a separate function call for getAudioMetadata outside
-        // the current function
 
         taglib_tag_free_strings();
         taglib_file_free(file);
     }
 
-    return l;
+    return count;
 }
 
 int getAudioMetadata(char *path, AudioMetadata *audio_metadata) {

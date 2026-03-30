@@ -5,6 +5,7 @@
 #include <taglib/tpropertymap.h>
 #include <taglib/tstringlist.h>
 
+#include <cstdio>
 #include <cstdlib>
 #include <string>
 
@@ -24,6 +25,7 @@ Taglib_Handler* taglib_open(const char* path) {
     handler->ref = new TagLib::FileRef(path);
 
     if (handler->ref->isNull()) {
+        printf("File can't be opened\n");
         delete handler->ref;
         delete handler;
         return nullptr;
