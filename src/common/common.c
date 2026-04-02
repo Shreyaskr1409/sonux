@@ -7,6 +7,7 @@
 #include <taglib/tag_c.h>
 #include <time.h>
 
+#include "query.h"
 #include "tag/tagger.h"
 
 // Static variables to this file to be declared below:
@@ -72,18 +73,22 @@ int main(int argc, char *argv[]) {
     printf("Number of Paths scanned: %d\n", scan_results->paths_arr_itr);
     printf("Number of Audio Files: %d\n", n_audio_files);
 
-    // Scan output logging:
-    for (int i = 0; i < n_audio_files; i++) {
-        AudioFile *f = &data_arr[i];
+    // // Scan output logging:
+    // for (int i = 0; i < n_audio_files; i++) {
+    //     AudioFile *f = &data_arr[i];
+    //
+    //     printf("\n%d.", i + 1);
+    //     printf("\nPath: %s\n", f->filepath);
+    //     printf("\nDisc No: %d\nTrack No: %d", f->audio_metadata->disc_no,
+    //            f->audio_metadata->track_no);
+    //     printf("\nTitle: %s\nAlbum: %s", f->audio_metadata->title, f->audio_metadata->album);
+    //     printf("\nArtist: %s\nAlbum Artist: %s\n", f->audio_metadata->artist,
+    //            f->audio_metadata->album_artist);
+    // }
 
-        printf("\n%d.", i + 1);
-        printf("\nPath: %s\n", f->filepath);
-        printf("\nDisc No: %d\nTrack No: %d", f->audio_metadata->disc_no,
-               f->audio_metadata->track_no);
-        printf("\nTitle: %s\nAlbum: %s", f->audio_metadata->title, f->audio_metadata->album);
-        printf("\nArtist: %s\nAlbum Artist: %s\n", f->audio_metadata->artist,
-               f->audio_metadata->album_artist);
-    }
+    db_init();
+    db_save_files(&data_arr, n_audio_files);
+    db_close();
 
     for (int i = 0; i < scan_results->paths_arr_len; i++) {
         free(scan_results->paths[i]);
@@ -201,6 +206,7 @@ int getAudioMetadata(char *path, AudioMetadata *audio_metadata) {
     audio_metadata->album = strdup(taglib_get_album(handler) ?: "");
     audio_metadata->track_no = taglib_get_track_no(handler);
     audio_metadata->disc_no = taglib_get_disc_no(handler);
+    audio_metadata->release_date = strdup("");
 
     taglib_close(handler);
     return 0;

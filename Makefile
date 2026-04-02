@@ -18,8 +18,8 @@ CXX = g++
 
 CFLAGS = -Wall -g
 CXXFLAGS = $(CFLAGS) -std=c++17
-LDLIBS = `pkg-config --libs gstreamer-1.0 taglib_c taglib`
-PKG_FLAGS = `pkg-config --cflags gstreamer-1.0 taglib_c taglib`
+LDLIBS = `pkg-config --libs gstreamer-1.0 taglib_c taglib sqlite3`
+PKG_FLAGS = `pkg-config --cflags gstreamer-1.0 taglib_c taglib sqlite3`
 
 .PHONY: all debug
 

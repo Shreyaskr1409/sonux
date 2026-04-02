@@ -4,12 +4,6 @@
 #include <ftw.h>
 #include <stdbool.h>
 
-typedef struct __Date {
-    int day;
-    int month;
-    int year;
-} Date;
-
 typedef struct __AudioMetadata {
     char* title;
     char* album;
@@ -17,7 +11,7 @@ typedef struct __AudioMetadata {
     char* album_artist;
     int   track_no;
     int   disc_no;
-    Date  release_date;
+    char* release_date;
 } AudioMetadata;
 
 typedef struct __AudioFile {

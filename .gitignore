@@ -3,6 +3,7 @@
 build/
 
 *.log
+*.db
 
 # Added by cargo
 
