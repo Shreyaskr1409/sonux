@@ -1,5 +1,6 @@
 mod component;
 mod font;
+mod view;
 
 use iced::{
     Element, Font,
@@ -8,10 +9,12 @@ use iced::{
     widget::{column, container, rule, text},
 };
 
-use crate::font::setup_fonts;
+use crate::{font::setup_fonts, view::library::{LibraryState, library_view}};
 
 #[derive(Debug, Default)]
-pub struct AppState {}
+pub struct AppState {
+    library_state: LibraryState
+}
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -22,7 +25,9 @@ pub enum Message {
 }
 
 pub fn new_app_state() -> AppState {
-    AppState {}
+    AppState {
+        library_state: LibraryState::default()
+    }
 }
 
 pub fn view(app_state: &AppState) -> Element<'_, Message> {
@@ -49,12 +54,17 @@ impl AppState {
     }
 
     fn content(&self) -> Element<'_, Message> {
-        container(text("Listen-Listen").size(24))
-            .width(Fill)
-            .height(Fill)
-            .padding(4)
-            .style(container::bordered_box)
-            .into()
+        column![
+            container(
+                column![
+                    library_view(&self.library_state)
+                ]
+            )
+                .width(Fill)
+                .height(Fill)
+                .padding(4)
+                .style(container::bordered_box),
+        ].into()
     }
 
     fn footer(&self) -> Element<'_, Message> {
