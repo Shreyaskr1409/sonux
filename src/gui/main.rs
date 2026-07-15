@@ -9,15 +9,19 @@ use iced::{
     widget::{column, container, rule, text},
 };
 
-use crate::{font::setup_fonts, view::library::{LibraryState, library_view}};
+use crate::{
+    font::setup_fonts,
+    view::library::{LibraryMessage, LibraryView},
+};
 
 #[derive(Debug, Default)]
 pub struct AppState {
-    library_state: LibraryState
+    library_view: LibraryView,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    Library(LibraryMessage),
     Default,
     Minimize,
     Maximize,
@@ -26,7 +30,7 @@ pub enum Message {
 
 pub fn new_app_state() -> AppState {
     AppState {
-        library_state: LibraryState::default()
+        library_view: LibraryView::default(),
     }
 }
 
@@ -55,16 +59,13 @@ impl AppState {
 
     fn content(&self) -> Element<'_, Message> {
         column![
-            container(
-                column![
-                    library_view(&self.library_state)
-                ]
-            )
+            container(column![LibraryView::view(&self.library_view)])
                 .width(Fill)
                 .height(Fill)
                 .padding(4)
                 .style(container::bordered_box),
-        ].into()
+        ]
+        .into()
     }
 
     fn footer(&self) -> Element<'_, Message> {
@@ -76,8 +77,12 @@ impl AppState {
     }
 }
 
-pub fn update(_app_state: &mut AppState, message: Message) -> Task<Message> {
+pub fn update(app_state: &mut AppState, message: Message) -> Task<Message> {
     match message {
+        Message::Library(msg) => {
+            app_state.library_view.update(msg);
+            ().into()
+        }
         Message::Default => {
             println!("Do nothing");
             ().into()
