@@ -1,7 +1,5 @@
 use iced::{Element, widget::column};
 
-use crate::Message;
-
-pub fn empty_element() -> Element<'static, Message> {
+pub fn empty_element<MessageType: 'static>() -> Element<'static, MessageType> {
     column![].into()
 }

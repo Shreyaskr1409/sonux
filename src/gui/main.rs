@@ -59,7 +59,7 @@ impl AppState {
 
     fn content(&self) -> Element<'_, Message> {
         column![
-            container(column![LibraryView::view(&self.library_view)])
+            container(column![LibraryView::view(&self.library_view).map(Message::Library)])
                 .width(Fill)
                 .height(Fill)
                 .padding(4)

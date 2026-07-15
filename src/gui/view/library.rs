@@ -1,5 +1,6 @@
-use iced::widget::{PaneGrid, button, column, container, grid, pane_grid, row, text};
-use iced::{Background, Theme};
+use iced::widget::pane_grid::Target;
+use iced::widget::{PaneGrid, button, column, container, grid, pane_grid, row, rule, text};
+use iced::{Alignment, Background, Theme};
 use iced::{Element, Length::Fill};
 
 use crate::Message;
@@ -38,7 +39,8 @@ pub struct LibraryView {
 
 #[derive(Debug, Clone)]
 pub enum LibraryMessage {
-    ResizeSidebar,
+    PaneResized(pane_grid::ResizeEvent),
+    PaneDragged(pane_grid::DragEvent),
 }
 
 impl Default for LibraryView {
@@ -68,7 +70,7 @@ impl Default for LibraryView {
 }
 
 impl LibraryView {
-    pub fn view(&self) -> Element<'_, Message> {
+    pub fn view(&self) -> Element<'_, LibraryMessage> {
         match self.view_layout {
             ViewLayout::GroupedLayout => grouped_layout(self),
             ViewLayout::TableLayout => empty_element(),
@@ -77,25 +79,49 @@ impl LibraryView {
 
     pub fn update(&mut self, message: LibraryMessage) {
         match message {
-            LibraryMessage::ResizeSidebar => {}
+            LibraryMessage::PaneResized(pane_grid::ResizeEvent {split, ratio}) => {
+                self.pane_state.resize(split, ratio);
+            }
+            LibraryMessage::PaneDragged(pane_grid::DragEvent::Dropped { pane, target }) => {
+                if let Target::Pane(other, _) = target {
+                    self.pane_state.swap(pane, other);
+                }
+                // self.pane_state.swap(pane, target);
+            }
+            LibraryMessage::PaneDragged(_) => {}
         }
     }
 }
 
-fn grouped_layout(library_view: &LibraryView) -> Element<'_, Message> {
+fn grouped_layout(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
     // Panes
     PaneGrid::new(&library_view.pane_state, |_pane, state, _is_maximized| {
         let content = match state.pane_type {
             PaneType::Main => library_content_view(library_view),
             PaneType::Sidebar => filter_sidebar_view(library_view),
         };
-        pane_grid::Content::new(content)
+
+        let controls: Element<'_, LibraryMessage> = row![
+            button("-"),
+        ].spacing(5).into();
+
+        pane_grid::Content::new(content).title_bar(
+            pane_grid::TitleBar::new(text(match state.pane_type {
+                PaneType::Main => "Library",
+                PaneType::Sidebar => "Filters",
+            }).width(Fill).align_x(Alignment::Center))
+            .style(container::bordered_box)
+            .padding(4)
+        )
     })
-    .spacing(4)
-    .into()
+    .on_resize(10, LibraryMessage::PaneResized)
+        .on_drag(LibraryMessage::PaneDragged)
+        .height(Fill)
+        .spacing(4)
+        .into()
 }
 
-fn library_content_view(_library_view: &LibraryView) -> Element<'static, Message> {
+fn library_content_view(_library_view: &LibraryView) -> Element<'static, LibraryMessage> {
     row![
         container(text("Hello world"))
             .width(Fill)
@@ -106,8 +132,8 @@ fn library_content_view(_library_view: &LibraryView) -> Element<'static, Message
     .into()
 }
 
-fn filter_sidebar_view(_library_view: &LibraryView) -> Element<'static, Message> {
-    column![
+fn filter_sidebar_view(_library_view: &LibraryView) -> Element<'static, LibraryMessage> {
+    container(column![
         container(
             grid([
                 button("A").into(),
@@ -131,16 +157,30 @@ fn filter_sidebar_view(_library_view: &LibraryView) -> Element<'static, Message>
             ])
             .fluid(40)
             .spacing(4)
-        )
-        .style(|theme: &Theme| {
-            let _palette = theme.extended_palette();
-            container::Style {
-                background: Some(Background::Color(_palette.background.base.color)),
-                ..container::rounded_box(theme)
-            }
-        })
-        .padding(4)
-        .height(Fill)
-    ]
+        ),
+
+        rule::horizontal(1),
+
+        column![
+            container("Mogwai").width(Fill).padding(4).style(container::bordered_box),
+            container("Mogwai").width(Fill).padding(4).style(container::bordered_box),
+            container("Mogwai").width(Fill).padding(4).style(container::bordered_box),
+            container("Mogwai").width(Fill).padding(4).style(container::bordered_box),
+            container("Mogwai").width(Fill).padding(4).style(container::bordered_box),
+            container("Mogwai").width(Fill).padding(4).style(container::bordered_box),
+            container("Mogwai").width(Fill).padding(4).style(container::bordered_box),
+            container("Mogwai").width(Fill).padding(4).style(container::bordered_box),
+            container("Mogwai").width(Fill).padding(4).style(container::bordered_box),
+        ].spacing(4),
+    ].spacing(4))
+    .padding(4)
+    .style(|theme: &Theme| {
+        let _palette = theme.extended_palette();
+        container::Style {
+            background: Some(Background::Color(_palette.background.base.color)),
+            ..container::rounded_box(theme)
+        }
+    })
+    .height(Fill)
     .into()
 }
