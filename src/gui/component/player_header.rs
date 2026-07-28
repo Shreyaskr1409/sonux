@@ -3,7 +3,7 @@ use iced::{
     widget::{Space, column, container, row, text},
 };
 
-use crate::{Message, component::button::custom_button};
+use crate::{Message, component::button::centered_button};
 
 pub fn player_header() -> Element<'static, Message> {
     row![
@@ -19,9 +19,9 @@ pub fn player_header() -> Element<'static, Message> {
                     .spacing(4),
                     Space::new().height(Length::Fill),
                     row![
-                        custom_button("\u{23EE}", 25.0, 25.0, 20.0),
-                        custom_button("\u{25B6}", 25.0, 25.0, 16.0),
-                        custom_button("\u{23ED}", 25.0, 25.0, 20.0),
+                        centered_button("\u{23EE}", 25.0, 25.0, 20.0),
+                        centered_button("\u{25B6}", 25.0, 25.0, 16.0),
+                        centered_button("\u{23ED}", 25.0, 25.0, 20.0),
                     ]
                     .spacing(4),
                 ],

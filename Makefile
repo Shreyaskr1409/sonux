@@ -1,4 +1,4 @@
-NAME = listen-listen
+NAME = sonux
 
 BUILD = build
 SRC_DIR = src
@@ -6,11 +6,11 @@ GUI_SRC = src/gui
 TUI_SRC = src/tui
 DAEMON_SRC = src/daemon
 COMMON_SRC = src/common
-GUI_TARGET = $(BUILD)/listen-gui
-TUI_TARGET = $(BUILD)/listen-tui
-DAEMON_TARGET = $(BUILD)/listen-daemon
+GUI_TARGET = $(BUILD)/sonux-gui
+TUI_TARGET = $(BUILD)/sonux-tui
+DAEMON_TARGET = $(BUILD)/sonux-daemon
 COMMON_TARGET = $(BUILD)/test-common
-GUI_TARGET_RELEASE = $(BUILD)/listen-gui-release
+GUI_TARGET_RELEASE = $(BUILD)/sonux-gui-release
 OBJ_DIR = $(BUILD)/obj
 
 CC	= gcc
@@ -26,7 +26,7 @@ PKG_FLAGS = `pkg-config --cflags gstreamer-1.0 taglib_c taglib sqlite3`
 all: $(GUI_TARGET_RELEASE) $(DAEMON_TARGET)
 debug: $(GUI_TARGET) $(DAEMON_TARGET) $(COMMON_TARGET)
 
-.PHONY: debug-gui debug-daemon
+.PHONY: sonux-gui debug-daemon
 debug-gui: $(GUI_TARGET)
 debug-daemon: $(DAEMON_TARGET)
 
@@ -38,12 +38,12 @@ debug-daemon: $(DAEMON_TARGET)
 $(GUI_TARGET_RELEASE):
 	@mkdir -p $(@D)
 	cargo build --release
-	cp target/release/listen-gui $(GUI_TARGET)
+	cp target/release/sonux-gui $(GUI_TARGET)
 
 $(GUI_TARGET):
 	@mkdir -p $(@D)
 	cargo build
-	cp target/debug/listen-gui $(GUI_TARGET)
+	cp target/debug/sonux-gui $(GUI_TARGET)
 
 $(OBJ_DIR)/%.o: %.c
 	@mkdir -p $(@D)
