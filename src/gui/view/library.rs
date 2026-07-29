@@ -1,13 +1,15 @@
 use iced::Length::Shrink;
 use iced::widget::pane_grid::Target;
 use iced::widget::rule::{horizontal, vertical};
-use iced::widget::{PaneGrid, button, column, container, grid, pane_grid, row, rule, scrollable, space, text};
+use iced::widget::{
+    PaneGrid, button, column, container, grid, pane_grid, row, rule, scrollable, space, text,
+};
 use iced::{Alignment, Background, Theme};
 use iced::{Element, Length::Fill};
 
 use crate::component::button::{listing_button, song_listing_button};
+use crate::component::empty_element::empty_element;
 use crate::component::style::base_bg_container;
-use crate::{component::empty_element::empty_element};
 
 #[derive(Debug, Default)]
 pub enum ViewLayout {
@@ -83,7 +85,7 @@ impl LibraryView {
 
     pub fn update(&mut self, message: LibraryMessage) {
         match message {
-            LibraryMessage::PaneResized(pane_grid::ResizeEvent {split, ratio}) => {
+            LibraryMessage::PaneResized(pane_grid::ResizeEvent { split, ratio }) => {
                 self.pane_state.resize(split, ratio);
             }
             LibraryMessage::PaneDragged(pane_grid::DragEvent::Dropped { pane, target }) => {
@@ -106,143 +108,200 @@ fn grouped_layout(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
             PaneType::Sidebar => filter_sidebar_view(library_view),
         };
 
-        let controls: Element<'_, LibraryMessage> = row![
-            button("-"),
-        ].spacing(5).into();
+        let controls: Element<'_, LibraryMessage> = row![button("-"),].spacing(5).into();
 
         pane_grid::Content::new(content).title_bar(
-            pane_grid::TitleBar::new(text(match state.pane_type {
-                PaneType::Main => "Library",
-                PaneType::Sidebar => "Filters",
-            }).width(Fill).align_x(Alignment::Center))
+            pane_grid::TitleBar::new(
+                text(match state.pane_type {
+                    PaneType::Main => "Library",
+                    PaneType::Sidebar => "Filters",
+                })
+                .width(Fill)
+                .align_x(Alignment::Center),
+            )
             .style(container::bordered_box)
-            .padding(4)
+            .padding(4),
         )
     })
     .on_resize(10, LibraryMessage::PaneResized)
-        .on_drag(LibraryMessage::PaneDragged)
-        .height(Fill)
-        .spacing(4)
-        .into()
-}
-
-fn library_content_view(library_view: &LibraryView) -> Element<'static, LibraryMessage> {
-    row![
-        container(column![
-            container(text("Mogwai").size(18)).padding(6),
-
-            container(
-                row![
-                library_content_left_pane(library_view),
-                vertical(1),
-                library_content_right_pane(library_view),
-                ].spacing(4)
-            )
-            // .style(base_bg_container)
-            .padding(4)
-            .height(Shrink)
-            .width(Fill),
-
-        ].spacing(4))
-            .width(Fill)
-            .padding(0),
-    ]
+    .on_drag(LibraryMessage::PaneDragged)
+    .height(Fill)
     .spacing(4)
     .into()
 }
 
-fn library_content_left_pane(_library_view: &LibraryView) -> Element<'static, LibraryMessage> {
+fn library_content_view(library_view: &LibraryView) -> Element<'static, LibraryMessage> {
+    scrollable(
+        row![
+            container(
+                column![
+                    container(text("Mogwai").size(18)).padding(6),
+                    album_content(library_view),
+                    horizontal(1),
+                    album_content(library_view),
+                    horizontal(1),
+                    album_content(library_view),
+                    horizontal(1),
+                    container(text("Mogwai").size(18)).padding(6),
+                    album_content(library_view),
+                ]
+                .spacing(4)
+            )
+            .width(Fill)
+            .padding(0),
+        ]
+        .spacing(4),
+    )
+    .direction(scrollable::Direction::Vertical(scrollable::Scrollbar::new()))
+    .into()
+}
+
+fn album_content(library_view: &LibraryView) -> Element<'static, LibraryMessage> {
+    container(
+        row![
+            album_content_left_pane(library_view),
+            vertical(1),
+            album_content_right_pane(library_view),
+        ]
+        .spacing(4),
+    )
+    // .style(base_bg_container)
+    .padding(4)
+    .height(Shrink)
+    .width(Fill)
+    .into()
+}
+
+fn album_content_left_pane(_library_view: &LibraryView) -> Element<'static, LibraryMessage> {
     column![
         container(space())
             .style(base_bg_container)
             .width(200)
             .height(200),
-
         column![
             text("Young Team").size(18),
             text("Mogwai").size(14),
             text("1997").size(14),
             text("1:05:02").size(14),
         ],
-    ].spacing(8).into()
+    ]
+    .spacing(8)
+    .into()
 }
 
-fn library_content_right_pane(_library_view: &LibraryView) -> Element<'static, LibraryMessage> {
-    container(
-        row![
+fn album_content_right_pane(_library_view: &LibraryView) -> Element<'static, LibraryMessage> {
+    scrollable(
+        container(row![
             column![
-                song_listing_button("1. Yes! I Am a Long Way From Home", LibraryMessage::ButtonPressed),
+                song_listing_button(
+                    "1. Yes! I Am a Long Way From Home",
+                    LibraryMessage::ButtonPressed
+                ),
                 horizontal(1),
-                song_listing_button("1. Yes! I Am a Long Way From Home", LibraryMessage::ButtonPressed),
+                song_listing_button(
+                    "1. Yes! I Am a Long Way From Home",
+                    LibraryMessage::ButtonPressed
+                ),
                 horizontal(1),
-                song_listing_button("1. Yes! I Am a Long Way From Home", LibraryMessage::ButtonPressed),
+                song_listing_button(
+                    "1. Yes! I Am a Long Way From Home",
+                    LibraryMessage::ButtonPressed
+                ),
                 horizontal(1),
-                song_listing_button("1. Yes! I Am a Long Way From Home", LibraryMessage::ButtonPressed),
+                song_listing_button(
+                    "1. Yes! I Am a Long Way From Home",
+                    LibraryMessage::ButtonPressed
+                ),
                 horizontal(1),
-                song_listing_button("1. Yes! I Am a Long Way From Home", LibraryMessage::ButtonPressed),
+                song_listing_button(
+                    "1. Yes! I Am a Long Way From Home",
+                    LibraryMessage::ButtonPressed
+                ),
                 horizontal(1),
-                song_listing_button("1. Yes! I Am a Long Way From Home", LibraryMessage::ButtonPressed),
+                song_listing_button(
+                    "1. Yes! I Am a Long Way From Home",
+                    LibraryMessage::ButtonPressed
+                ),
                 horizontal(1),
-                song_listing_button("1. Yes! I Am a Long Way From Home", LibraryMessage::ButtonPressed),
+                song_listing_button(
+                    "1. Yes! I Am a Long Way From Home",
+                    LibraryMessage::ButtonPressed
+                ),
                 horizontal(1),
-                song_listing_button("1. Yes! I Am a Long Way From Home", LibraryMessage::ButtonPressed),
+                song_listing_button(
+                    "1. Yes! I Am a Long Way From Home",
+                    LibraryMessage::ButtonPressed
+                ),
                 horizontal(1),
-                song_listing_button("1. Yes! I Am a Long Way From Home", LibraryMessage::ButtonPressed),
+                song_listing_button(
+                    "1. Yes! I Am a Long Way From Home",
+                    LibraryMessage::ButtonPressed
+                ),
                 horizontal(1),
-                song_listing_button("1. Yes! I Am a Long Way From Home", LibraryMessage::ButtonPressed),
+                song_listing_button(
+                    "1. Yes! I Am a Long Way From Home",
+                    LibraryMessage::ButtonPressed
+                ),
                 horizontal(1),
-                song_listing_button("1. Yes! I Am a Long Way From Home", LibraryMessage::ButtonPressed),
-                horizontal(1),
-                song_listing_button("1. Yes! I Am a Long Way From Home", LibraryMessage::ButtonPressed),
-            ].spacing(4),
-        ]
-    )
+                song_listing_button(
+                    "1. Yes! I Am a Long Way From Home",
+                    LibraryMessage::ButtonPressed
+                ),
+            ]
+            .spacing(4),
+        ])
         .style(base_bg_container)
-        .padding(4)
-        .into()
+        .padding(4),
+    )
+    .direction(scrollable::Direction::Horizontal(
+        scrollable::Scrollbar::new(),
+    ))
+    .into()
 }
 
 fn filter_sidebar_view(_library_view: &LibraryView) -> Element<'static, LibraryMessage> {
-    container(column![
-        container(
-            grid([
-                button("A").into(),
-                button("B").into(),
-                button("C").into(),
-                button("D").into(),
-                button("E").into(),
-                button("F").into(),
-                button("A").into(),
-                button("B").into(),
-                button("C").into(),
-                button("D").into(),
-                button("E").into(),
-                button("F").into(),
-                button("A").into(),
-                button("B").into(),
-                button("C").into(),
-                button("D").into(),
-                button("E").into(),
-                button("F").into(),
-            ])
-            .fluid(40)
-            .spacing(4)
-        ),
-
-        rule::horizontal(1),
-
+    container(
         column![
-            listing_button("Mogwai", LibraryMessage::ButtonPressed),
-            listing_button("Mogwai", LibraryMessage::ButtonPressed),
-            listing_button("Mogwai", LibraryMessage::ButtonPressed),
-            listing_button("Mogwai", LibraryMessage::ButtonPressed),
-            listing_button("Mogwai", LibraryMessage::ButtonPressed),
-            listing_button("Mogwai", LibraryMessage::ButtonPressed),
-            listing_button("Mogwai", LibraryMessage::ButtonPressed),
-            listing_button("Mogwai", LibraryMessage::ButtonPressed),
-            listing_button("Mogwai", LibraryMessage::ButtonPressed),
-        ].spacing(4),
-    ].spacing(4))
+            container(
+                grid([
+                    button("A").into(),
+                    button("B").into(),
+                    button("C").into(),
+                    button("D").into(),
+                    button("E").into(),
+                    button("F").into(),
+                    button("A").into(),
+                    button("B").into(),
+                    button("C").into(),
+                    button("D").into(),
+                    button("E").into(),
+                    button("F").into(),
+                    button("A").into(),
+                    button("B").into(),
+                    button("C").into(),
+                    button("D").into(),
+                    button("E").into(),
+                    button("F").into(),
+                ])
+                .fluid(40)
+                .spacing(4)
+            ),
+            rule::horizontal(1),
+            column![
+                listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                listing_button("Mogwai", LibraryMessage::ButtonPressed),
+            ]
+            .spacing(4),
+        ]
+        .spacing(4),
+    )
     .padding(4)
     .style(|theme: &Theme| {
         let _palette = theme.extended_palette();

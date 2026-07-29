@@ -1,5 +1,5 @@
 use iced::{
-    Alignment, Element, Length::{self, Fill},
+    Alignment, Element, Length::{self, Fill, Shrink},
     widget::{self, button, container, text},
 };
 
@@ -29,10 +29,10 @@ pub fn listing_button<MessageType: Clone + 'static>(txt: &str, message: MessageT
 
 pub fn song_listing_button<MessageType: Clone + 'static>(txt: &str, message: MessageType) -> Element<'static, MessageType> {
     widget::button(
-        text(String::from(txt)).size(14)
+        text(String::from(txt)).size(14).wrapping(text::Wrapping::None)
     )
     .on_press(message)
-    .width(Fill)
+    .width(Shrink)
     .padding(4)
     .style(button::text)
     .into()
