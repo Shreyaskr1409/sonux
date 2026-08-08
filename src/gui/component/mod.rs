@@ -1,5 +1,3 @@
 pub mod button;
-pub mod player_header;
-pub mod title_bar;
-pub mod empty_element;
 pub mod style;
+pub mod table;

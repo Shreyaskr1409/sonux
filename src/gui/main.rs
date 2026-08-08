@@ -1,17 +1,17 @@
 mod component;
-mod font;
+mod data;
+mod query;
 mod view;
 
-use iced::{
-    Element, Font,
-    Length::Fill,
-    Task, Theme,
-    widget::{column, container, rule, text},
-};
+use iced::{Element, Font, Task, Theme, widget::column};
 
 use crate::{
-    font::setup_fonts,
-    view::library::{LibraryMessage, LibraryView},
+    component::style::setup_fonts,
+    view::{
+        library::{LibraryMessage, LibraryView, player_library},
+        player_footer::player_footer,
+        player_header::player_header,
+    },
 };
 
 #[derive(Debug, Default)]
@@ -43,37 +43,15 @@ pub fn view(app_state: &AppState) -> Element<'_, Message> {
 
 impl AppState {
     fn header(&self) -> Element<'_, Message> {
-        container(
-            column![
-                component::title_bar::title_bar(),
-                rule::horizontal(1),
-                component::player_header::player_header()
-            ]
-            .spacing(4),
-        )
-        .width(Fill)
-        .padding(4)
-        .style(container::bordered_box)
-        .into()
+        player_header()
     }
 
     fn content(&self) -> Element<'_, Message> {
-        column![
-            container(column![LibraryView::view(&self.library_view).map(Message::Library)])
-                .width(Fill)
-                .height(Fill)
-                .padding(4)
-                .style(container::bordered_box),
-        ]
-        .into()
+        player_library(&self)
     }
 
     fn footer(&self) -> Element<'_, Message> {
-        container(text("Listen-Listen").size(24))
-            .width(Fill)
-            .padding(4)
-            .style(container::bordered_box)
-            .into()
+        player_footer()
     }
 }
 

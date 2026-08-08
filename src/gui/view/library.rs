@@ -7,9 +7,10 @@ use iced::widget::{
 use iced::{Alignment, Background, Theme};
 use iced::{Element, Length::Fill};
 
-use crate::component::button::{listing_button, song_listing_button};
-use crate::component::empty_element::empty_element;
-use crate::component::style::base_bg_container;
+use crate::component::button::listing_button;
+use crate::component::style::base_bg_container_style;
+use crate::component::table::ResizableTable;
+use crate::{AppState, Message};
 
 #[derive(Debug, Default)]
 pub enum ViewLayout {
@@ -36,17 +37,65 @@ struct PaneState {
 }
 
 #[derive(Debug)]
+struct TableState {
+    column_widths: Vec<f32>,
+    headers: Vec<String>,
+    data: Vec<Vec<String>>,
+}
+
+#[derive(Debug)]
 pub struct LibraryView {
     view_layout: ViewLayout,
     filter_sidebar: FilterSidebar,
     pane_state: pane_grid::State<PaneState>,
+    table_state: TableState,
 }
 
 #[derive(Debug, Clone)]
 pub enum LibraryMessage {
+    ColumnResized(usize, f32),
     PaneResized(pane_grid::ResizeEvent),
     PaneDragged(pane_grid::DragEvent),
     ButtonPressed,
+}
+
+pub fn player_library(app_state: &AppState) -> Element<'_, Message> {
+    column![
+        container(column![
+            LibraryView::view(&app_state.library_view).map(Message::Library)
+        ])
+        .width(Fill)
+        .height(Fill)
+        .padding(4)
+        .style(container::bordered_box),
+    ]
+    .into()
+}
+
+impl TableState {
+    fn new() -> Self {
+        Self {
+            column_widths: vec![100.0, 500.0, 120.0],
+            headers: vec![
+                "Track No.".to_string(),
+                "Title".to_string(),
+                "Duration".to_string(),
+            ],
+            data: vec![
+                vec!["1".into(), "Yes! I Am a Long Way From Home".into(), "3:20".into()],
+                vec!["1".into(), "Yes! I Am a Long Way From Home".into(), "3:20".into()],
+                vec!["1".into(), "Yes! I Am a Long Way From Home".into(), "3:20".into()],
+                vec!["1".into(), "Yes! I Am a Long Way From Home".into(), "3:20".into()],
+                vec!["1".into(), "Yes! I Am a Long Way From Home".into(), "3:20".into()],
+                vec!["1".into(), "Yes! I Am a Long Way From Home".into(), "3:20".into()],
+                vec!["1".into(), "Yes! I Am a Long Way From Home".into(), "3:20".into()],
+                vec!["1".into(), "Yes! I Am a Long Way From Home".into(), "3:20".into()],
+                vec!["1".into(), "Yes! I Am a Long Way From Home".into(), "3:20".into()],
+                vec!["1".into(), "Yes! I Am a Long Way From Home".into(), "3:20".into()],
+                vec!["1".into(), "Yes! I Am a Long Way From Home".into(), "3:20".into()],
+            ],
+        }
+    }
 }
 
 impl Default for LibraryView {
@@ -71,6 +120,7 @@ impl Default for LibraryView {
             view_layout: ViewLayout::GroupedLayout,
             filter_sidebar: FilterSidebar { width: 300 },
             pane_state: pane_state,
+            table_state: TableState::new(),
         }
     }
 }
@@ -78,13 +128,18 @@ impl Default for LibraryView {
 impl LibraryView {
     pub fn view(&self) -> Element<'_, LibraryMessage> {
         match self.view_layout {
-            ViewLayout::GroupedLayout => grouped_layout(self),
-            ViewLayout::TableLayout => empty_element(),
+            ViewLayout::GroupedLayout => grouped_layout_view(self),
+            ViewLayout::TableLayout => space().into(),
         }
     }
 
     pub fn update(&mut self, message: LibraryMessage) {
         match message {
+            LibraryMessage::ColumnResized(index, new_width) => {
+                if let Some(w) = self.table_state.column_widths.get_mut(index) {
+                    *w = new_width;
+                }
+            }
             LibraryMessage::PaneResized(pane_grid::ResizeEvent { split, ratio }) => {
                 self.pane_state.resize(split, ratio);
             }
@@ -100,7 +155,7 @@ impl LibraryView {
     }
 }
 
-fn grouped_layout(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
+fn grouped_layout_view(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
     // Panes
     PaneGrid::new(&library_view.pane_state, |_pane, state, _is_maximized| {
         let content = match state.pane_type {
@@ -108,7 +163,7 @@ fn grouped_layout(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
             PaneType::Sidebar => filter_sidebar_view(library_view),
         };
 
-        let controls: Element<'_, LibraryMessage> = row![button("-"),].spacing(5).into();
+        // let controls: Element<'_, LibraryMessage> = row![button("-"),].spacing(5).into();
 
         pane_grid::Content::new(content).title_bar(
             pane_grid::TitleBar::new(
@@ -130,7 +185,7 @@ fn grouped_layout(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
     .into()
 }
 
-fn library_content_view(library_view: &LibraryView) -> Element<'static, LibraryMessage> {
+fn library_content_view(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
     scrollable(
         row![
             container(
@@ -156,7 +211,7 @@ fn library_content_view(library_view: &LibraryView) -> Element<'static, LibraryM
     .into()
 }
 
-fn album_content(library_view: &LibraryView) -> Element<'static, LibraryMessage> {
+fn album_content(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
     container(
         row![
             album_content_left_pane(library_view),
@@ -175,7 +230,7 @@ fn album_content(library_view: &LibraryView) -> Element<'static, LibraryMessage>
 fn album_content_left_pane(_library_view: &LibraryView) -> Element<'static, LibraryMessage> {
     column![
         container(space())
-            .style(base_bg_container)
+            .style(base_bg_container_style)
             .width(200)
             .height(200),
         column![
@@ -189,68 +244,53 @@ fn album_content_left_pane(_library_view: &LibraryView) -> Element<'static, Libr
     .into()
 }
 
-fn album_content_right_pane(_library_view: &LibraryView) -> Element<'static, LibraryMessage> {
+fn album_content_table(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
+    let headers: Vec<Element<LibraryMessage>> = library_view
+                .table_state
+                .headers
+                .iter()
+                .map(|h| {
+                    container(text(h).size(20))
+                        .padding(4)
+                        .width(Fill)
+                        .into()
+                })
+                .collect();
+
+    let rows: Vec<Vec<Element<LibraryMessage>>> = library_view
+        .table_state
+        .data
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|cell| {
+                    container(text(cell).size(16))
+                        .padding(4)
+                        .width(Fill)
+                        .into()
+                })
+            .collect()
+        })
+    .collect();
+
+    let table = ResizableTable::new(&library_view.table_state.column_widths, LibraryMessage::ColumnResized)
+        .headers(headers)
+        .rows(rows)
+        .min_width(60.0);
+
+    container(table)
+        .into()
+}
+
+fn album_content_right_pane(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
     scrollable(
         container(row![
             column![
-                song_listing_button(
-                    "1. Yes! I Am a Long Way From Home",
-                    LibraryMessage::ButtonPressed
-                ),
-                horizontal(1),
-                song_listing_button(
-                    "1. Yes! I Am a Long Way From Home",
-                    LibraryMessage::ButtonPressed
-                ),
-                horizontal(1),
-                song_listing_button(
-                    "1. Yes! I Am a Long Way From Home",
-                    LibraryMessage::ButtonPressed
-                ),
-                horizontal(1),
-                song_listing_button(
-                    "1. Yes! I Am a Long Way From Home",
-                    LibraryMessage::ButtonPressed
-                ),
-                horizontal(1),
-                song_listing_button(
-                    "1. Yes! I Am a Long Way From Home",
-                    LibraryMessage::ButtonPressed
-                ),
-                horizontal(1),
-                song_listing_button(
-                    "1. Yes! I Am a Long Way From Home",
-                    LibraryMessage::ButtonPressed
-                ),
-                horizontal(1),
-                song_listing_button(
-                    "1. Yes! I Am a Long Way From Home",
-                    LibraryMessage::ButtonPressed
-                ),
-                horizontal(1),
-                song_listing_button(
-                    "1. Yes! I Am a Long Way From Home",
-                    LibraryMessage::ButtonPressed
-                ),
-                horizontal(1),
-                song_listing_button(
-                    "1. Yes! I Am a Long Way From Home",
-                    LibraryMessage::ButtonPressed
-                ),
-                horizontal(1),
-                song_listing_button(
-                    "1. Yes! I Am a Long Way From Home",
-                    LibraryMessage::ButtonPressed
-                ),
-                horizontal(1),
-                song_listing_button(
-                    "1. Yes! I Am a Long Way From Home",
-                    LibraryMessage::ButtonPressed
-                ),
+                album_content_table(library_view),
             ]
             .spacing(4),
         ])
-        .style(base_bg_container)
+        .style(base_bg_container_style)
         .padding(4),
     )
     .direction(scrollable::Direction::Horizontal(

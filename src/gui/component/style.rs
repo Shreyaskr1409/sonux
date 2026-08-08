@@ -1,6 +1,32 @@
-use iced::{Background, Border, Theme, widget::{button::{self, Status}, container}};
+use iced::{
+    Background, Border, Theme,
+    widget::{
+        button::{self, Status},
+        container,
+    },
+};
 
-pub fn base_bg_container(theme: &Theme) -> container::Style {
+use iced::font;
+
+pub struct FontConfig {
+    pub default_font_family: &'static str,
+}
+
+pub const ZED_MONO_REGULAR_BYTES: &[u8] =
+    include_bytes!("./../assets/fonts/ZedMono/ZedMonoNerdFont-Regular.ttf");
+
+fn load_fonts() {
+    _ = font::load(ZED_MONO_REGULAR_BYTES);
+}
+
+pub fn setup_fonts() -> FontConfig {
+    load_fonts();
+    FontConfig {
+        default_font_family: "ZedMono NF",
+    }
+}
+
+pub fn base_bg_container_style(theme: &Theme) -> container::Style {
     let palette = theme.extended_palette();
 
     container::Style {
@@ -12,7 +38,7 @@ pub fn base_bg_container(theme: &Theme) -> container::Style {
 pub fn listing_button_style(theme: &Theme, status: Status) -> button::Style {
     let palette = theme.extended_palette();
 
-    let base = button::Style { 
+    let base = button::Style {
         background: Some(palette.background.weakest.color.into()),
         text_color: palette.background.weakest.text,
         border: Border {

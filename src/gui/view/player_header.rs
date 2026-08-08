@@ -1,11 +1,34 @@
 use iced::{
-    Alignment, Background, Element, Length, Padding, Theme,
-    widget::{Space, column, container, row, text},
+    Alignment, Background, Element,
+    Length::{self, Fill},
+    Padding, Theme,
+    widget::{Space, button, column, container, row, rule, space, text},
 };
 
 use crate::{Message, component::button::centered_button};
 
 pub fn player_header() -> Element<'static, Message> {
+    container(column![title_bar(), rule::horizontal(1), now_playing_header(),].spacing(4))
+        .width(Fill)
+        .padding(4)
+        .style(container::bordered_box)
+        .into()
+}
+
+pub fn title_bar() -> Element<'static, Message> {
+    row![
+        button("Home").on_press(Message::Default),
+        text("Listen-Listen").size(24),
+        space::horizontal(),
+        button("-").on_press(Message::Minimize),
+        button("=").on_press(Message::Maximize),
+        button("X").on_press(Message::Exit),
+    ]
+    .spacing(4)
+    .into()
+}
+
+pub fn now_playing_header() -> Element<'static, Message> {
     row![
         container(Space::new().height(150).width(150)).style(container::rounded_box),
         column![
