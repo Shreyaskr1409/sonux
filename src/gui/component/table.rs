@@ -15,7 +15,7 @@ pub enum TableMessage {
 pub struct ResizableTable<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
     headers: Vec<Element<'a, Message, Theme, Renderer>>,
     rows: Vec<Vec<Element<'a, Message, Theme, Renderer>>>,
-    widths: &'a [f32],
+    widths: Vec<f32>,
     min_width: f32,
     handle_width: f32,
     on_resize: Box<dyn Fn(usize, f32) -> Message + 'a>,
@@ -25,14 +25,14 @@ impl<'a, Message, Theme, Renderer> ResizableTable<'a, Message, Theme, Renderer>
 where
     Renderer: renderer::Renderer,
 {
-    pub fn new<F>(widths: &'a [f32], on_resize: F) -> Self
+    pub fn new<F>(widths: impl Into<Vec<f32>>, on_resize: F) -> Self
     where
         F: Fn(usize, f32) -> Message + 'a,
     {
         Self {
             headers: Vec::new(),
             rows: Vec::new(),
-            widths,
+            widths: widths.into(),
             min_width: 50.0,
             handle_width: 6.0,
             on_resize: Box::new(on_resize),

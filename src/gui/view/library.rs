@@ -2,7 +2,7 @@ use iced::Length::Shrink;
 use iced::widget::pane_grid::Target;
 use iced::widget::rule::{horizontal, vertical};
 use iced::widget::{
-    PaneGrid, button, column, container, grid, pane_grid, row, rule, scrollable, space, text,
+    PaneGrid, button, column, container, grid, pane_grid, responsive, row, rule, scrollable, space, text, text_editor
 };
 use iced::{Alignment, Background, Theme};
 use iced::{Element, Length::Fill};
@@ -44,11 +44,17 @@ struct TableState {
 }
 
 #[derive(Debug)]
+struct TextboxState {
+    text_editor_content: text_editor::Content,
+}
+
+#[derive(Debug)]
 pub struct LibraryView {
     view_layout: ViewLayout,
     filter_sidebar: FilterSidebar,
     pane_state: pane_grid::State<PaneState>,
     table_state: TableState,
+    path_textbox_state: TextboxState,
 }
 
 #[derive(Debug, Clone)]
@@ -121,6 +127,7 @@ impl Default for LibraryView {
             filter_sidebar: FilterSidebar { width: 300 },
             pane_state: pane_state,
             table_state: TableState::new(),
+            path_textbox_state: TextboxState { text_editor_content: text_editor::Content::new() }
         }
     }
 }
@@ -244,7 +251,7 @@ fn album_content_left_pane(_library_view: &LibraryView) -> Element<'static, Libr
     .into()
 }
 
-fn album_content_table(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
+fn album_content_table(library_view: &LibraryView, effective_widths: Vec<f32>) -> Element<'_, LibraryMessage> {
     let headers: Vec<Element<LibraryMessage>> = library_view
                 .table_state
                 .headers
@@ -273,7 +280,7 @@ fn album_content_table(library_view: &LibraryView) -> Element<'_, LibraryMessage
         })
     .collect();
 
-    let table = ResizableTable::new(&library_view.table_state.column_widths, LibraryMessage::ColumnResized)
+    let table = ResizableTable::new(effective_widths, LibraryMessage::ColumnResized)
         .headers(headers)
         .rows(rows)
         .min_width(60.0);
@@ -283,73 +290,111 @@ fn album_content_table(library_view: &LibraryView) -> Element<'_, LibraryMessage
 }
 
 fn album_content_right_pane(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
-    scrollable(
-        container(row![
-            column![
-                album_content_table(library_view),
-            ]
-            .spacing(4),
-        ])
-        .style(base_bg_container_style)
-        .padding(4),
-    )
-    .direction(scrollable::Direction::Horizontal(
-        scrollable::Scrollbar::new(),
-    ))
+    responsive(move |size| {
+        // Account for outer padding (4 left + 4 right = 8px)
+        let available_width = (size.width - 8.0).max(0.0);
+
+        let raw_widths = &library_view.table_state.column_widths;
+        let total_widths: f32 = raw_widths.iter().sum();
+
+        // Dynamically compute column widths:
+        // Stretch proportionally if extra space exists, otherwise keep base widths for scrolling
+        let effective_widths: Vec<f32> = if available_width > total_widths && total_widths > 0.0 {
+            let mut widths = raw_widths.clone();
+            let extra_space = available_width - total_widths;
+
+            if let Some(last) = widths.last_mut() {
+                *last += extra_space;
+            }
+
+            widths
+        } else {
+            raw_widths.clone()
+        };
+
+        scrollable(
+            container(row![
+                column![
+                    album_content_table(library_view, effective_widths),
+                ]
+                .spacing(4),
+            ])
+            .style(base_bg_container_style)
+            .padding(4),
+        )
+        .direction(scrollable::Direction::Horizontal(
+            scrollable::Scrollbar::new(),
+        ))
+        .into()
+    })
+    .height(Shrink)
     .into()
 }
 
-fn filter_sidebar_view(_library_view: &LibraryView) -> Element<'static, LibraryMessage> {
-    container(
-        column![
-            container(
-                grid([
-                    button("A").into(),
-                    button("B").into(),
-                    button("C").into(),
-                    button("D").into(),
-                    button("E").into(),
-                    button("F").into(),
-                    button("A").into(),
-                    button("B").into(),
-                    button("C").into(),
-                    button("D").into(),
-                    button("E").into(),
-                    button("F").into(),
-                    button("A").into(),
-                    button("B").into(),
-                    button("C").into(),
-                    button("D").into(),
-                    button("E").into(),
-                    button("F").into(),
-                ])
-                .fluid(40)
-                .spacing(4)
-            ),
-            rule::horizontal(1),
+fn filter_sidebar_view(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
+    column![
+        container(
             column![
-                listing_button("Mogwai", LibraryMessage::ButtonPressed),
-                listing_button("Mogwai", LibraryMessage::ButtonPressed),
-                listing_button("Mogwai", LibraryMessage::ButtonPressed),
-                listing_button("Mogwai", LibraryMessage::ButtonPressed),
-                listing_button("Mogwai", LibraryMessage::ButtonPressed),
-                listing_button("Mogwai", LibraryMessage::ButtonPressed),
-                listing_button("Mogwai", LibraryMessage::ButtonPressed),
-                listing_button("Mogwai", LibraryMessage::ButtonPressed),
-                listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                container(
+                    grid([
+                        button("A").into(),
+                        button("B").into(),
+                        button("C").into(),
+                        button("D").into(),
+                        button("E").into(),
+                        button("F").into(),
+                        button("A").into(),
+                        button("B").into(),
+                        button("C").into(),
+                        button("D").into(),
+                        button("E").into(),
+                        button("F").into(),
+                        button("A").into(),
+                        button("B").into(),
+                        button("C").into(),
+                        button("D").into(),
+                        button("E").into(),
+                        button("F").into(),
+                    ])
+                    .fluid(40)
+                    .spacing(4)
+                ),
+                rule::horizontal(1),
+                column![
+                    listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                    listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                    listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                    listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                    listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                    listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                    listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                    listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                    listing_button("Mogwai", LibraryMessage::ButtonPressed),
+                ]
+                .spacing(4),
             ]
             .spacing(4),
-        ]
-        .spacing(4),
-    )
-    .padding(4)
-    .style(|theme: &Theme| {
-        let _palette = theme.extended_palette();
-        container::Style {
-            background: Some(Background::Color(_palette.background.base.color)),
-            ..container::rounded_box(theme)
-        }
-    })
-    .height(Fill)
+        )
+        .padding(4)
+        .style(|theme: &Theme| {
+            let _palette = theme.extended_palette();
+            container::Style {
+                background: Some(Background::Color(_palette.background.base.color)),
+                ..container::rounded_box(theme)
+            }
+        })
+        .height(Fill),
+
+        row![
+            text("Search paths").width(Fill).height(Fill).align_y(Alignment::Center),
+            button("Scan for Music").on_press(LibraryMessage::ButtonPressed),
+        ].width(Fill).height(Shrink),
+
+        text_editor(&library_view.path_textbox_state.text_editor_content)
+            .placeholder("Enter a path in each line")
+            .height(100),
+
+    ]
+        .spacing(4)
     .into()
 }
