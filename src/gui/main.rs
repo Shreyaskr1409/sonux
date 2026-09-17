@@ -3,13 +3,12 @@ mod data;
 mod query;
 mod view;
 
-
 use iced::{Element, Font, Task, Theme, widget::column};
 use rusqlite::Connection;
 
 use crate::{
     component::style::setup_fonts,
-    data::music::{Library, Metadata, populate_fields},
+    data::music::{Library, Metadata},
     query::{get_metadata, init},
     view::{
         library::{LibraryMessage, LibraryView, player_library},
@@ -69,7 +68,9 @@ pub fn new_app_state() -> (AppState, Task<Message>) {
         Ok(m) => m,
     };
 
-    populate_fields(&mut state.library, &metadata_list);
+    Library::populate_fields(&mut state.library, &metadata_list);
+
+    state.library_view.add_fields_from_library(&state.library);
 
     (state, Task::none())
 }
@@ -87,7 +88,7 @@ impl AppState {
     }
 
     fn content(&self) -> Element<'_, Message> {
-        player_library(&self)
+        player_library(&self.library_view, &self.library)
     }
 
     fn footer(&self) -> Element<'_, Message> {
@@ -97,7 +98,10 @@ impl AppState {
 
 pub fn update(app_state: &mut AppState, message: Message) -> Task<Message> {
     match message {
-        Message::Library(msg) => app_state.library_view.update(msg).map(Message::Library),
+        Message::Library(msg) => app_state
+            .library_view
+            .update(msg, &app_state.library)
+            .map(Message::Library),
 
         Message::Default => {
             println!("Do nothing");
@@ -114,18 +118,16 @@ pub fn update(app_state: &mut AppState, message: Message) -> Task<Message> {
             ().into()
         }
 
-        Message::Error(e) => {
-            match e {
-                ErrMessage::ErrDbInitFailed => {
-                    println!("Handler ran for ErrDbInitFailed");
-                    ().into()
-                },
-                ErrMessage::ErrMetadataFetchingFailed => {
-                    println!("Handler ran for ErrMetadataFetchingFailed");
-                    ().into()
-                },
+        Message::Error(e) => match e {
+            ErrMessage::ErrDbInitFailed => {
+                println!("Handler ran for ErrDbInitFailed");
+                ().into()
             }
-        }
+            ErrMessage::ErrMetadataFetchingFailed => {
+                println!("Handler ran for ErrMetadataFetchingFailed");
+                ().into()
+            }
+        },
 
         Message::Exit => iced::exit(),
     }

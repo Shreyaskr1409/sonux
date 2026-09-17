@@ -1,4 +1,8 @@
-use std::{collections::HashMap, path::PathBuf, time::Duration};
+use std::{
+    collections::{BTreeSet, HashMap},
+    path::PathBuf,
+    time::Duration,
+};
 
 use uuid::Uuid;
 
@@ -32,9 +36,9 @@ pub struct Song {
     pub _path: PathBuf,
 
     // Metadata
-    pub title: String,
-    pub track_no: u16,
-    pub disc_no: u16,
+    pub _title: String,
+    pub _track_no: u16,
+    pub _disc_no: u16,
 
     // Relationships
     pub _artist: ArtistNameAsId,
@@ -46,9 +50,9 @@ pub struct Song {
 
 #[derive(Debug)]
 pub struct Album {
-    pub title: String,
+    pub _title: String,
     pub _album_artist: ArtistNameAsId,
-    pub year: Option<u16>,
+    pub _year: Option<u16>,
 
     pub songs: Vec<SongId>,
 }
@@ -56,9 +60,9 @@ pub struct Album {
 impl Album {
     pub fn new(title: String, album_artist: String, year: Option<u16>) -> Album {
         Album {
-            title,
+            _title: title,
             _album_artist: ArtistNameAsId(album_artist),
-            year,
+            _year: year,
             songs: Vec::new(),
         }
     }
@@ -96,56 +100,82 @@ impl Library {
             artists: HashMap::new(),
         }
     }
-}
 
-pub fn populate_fields(lib: &mut Library, metadata_list: &Vec<Metadata>) {
-    for elem in metadata_list {
-        let song_id = SongId(Uuid::now_v7());
-        let artist_id = ArtistNameAsId(elem.album_artist.clone());
-        let album_id = AlbumId {
-            album_artist: artist_id.clone(),
-            title: elem.album.clone(),
+    pub fn populate_fields(lib: &mut Self, metadata_list: &Vec<Metadata>) {
+        for elem in metadata_list {
+            let song_id = SongId(Uuid::now_v7());
+            let artist_id = ArtistNameAsId(elem.album_artist.clone());
+            let album_id = AlbumId {
+                album_artist: artist_id.clone(),
+                title: elem.album.clone(),
+            };
+
+            let year = Some(0000); // to be replaced with year extracted from release date field
+
+            lib.artists
+                .entry(artist_id.clone())
+                .or_insert_with(|| Artist::new(artist_id.0.clone()));
+
+            let album = lib
+                .albums
+                .entry(album_id.clone())
+                .or_insert_with(|| Album::new(elem.album.clone(), artist_id.0.clone(), year));
+
+            let song = Song {
+                _path: PathBuf::from(&elem.path),
+                _title: elem.title.clone(),
+                _track_no: elem.track_no as u16,
+                _disc_no: elem.disc_no as u16,
+                _artist: ArtistNameAsId(elem.artist.clone()),
+                _album: album_id,
+                _duration: None,
+            };
+
+            lib.songs.insert(song_id, song);
+            album.add_song(song_id);
+        }
+    }
+
+    pub fn _songs_for_album(&self, album_id: &AlbumId) -> Vec<SongId> {
+        let album = match self.albums.get(album_id) {
+            Some(a) => a,
+            None => return Vec::new(),
         };
+        let mut songs = album.songs.clone();
 
-        let year = Some(0000); // to be replaced with year extracted from release date field
+        songs.sort_by_key(|id| {
+            let song = self.songs.get(id).unwrap();
+            (song._disc_no, song._track_no)
+        });
+        songs
+    }
 
-        lib.artists
-            .entry(artist_id.clone())
-            .or_insert_with(|| Artist::new(artist_id.0.clone()));
-
-        let album = lib
+    pub fn _albums_for_artists(&self, artist_ids: &[&ArtistNameAsId]) -> Vec<AlbumId> {
+        let mut albums: Vec<AlbumId> = self
             .albums
-            .entry(album_id.clone())
-            .or_insert_with(|| Album::new(elem.album.clone(), artist_id.0.clone(), year));
+            .iter()
+            .filter(|(_, album)| artist_ids.contains(&&album._album_artist))
+            .map(|(album_id, _)| album_id.clone())
+            .collect();
 
-        let song = Song {
-            _path: PathBuf::from(&elem.path),
-            title: elem.title.clone(),
-            track_no: elem.track_no as u16,
-            disc_no: elem.disc_no as u16,
-            _artist: ArtistNameAsId(elem.artist.clone()),
-            _album: album_id,
-            _duration: None,
-        };
-
-        lib.songs.insert(song_id, song);
-        album.add_song(song_id);
+        albums.sort_by(|a, b| a.title.cmp(&b.title));
+        albums
     }
 
-    for (i, (_song_id, song)) in lib.songs.iter().enumerate() {
-        if i == 10 {
-            break;
-        }
-        println!(
-            "Song: {}, #track: {}, #disc: {}",
-            song.title, song.track_no, song.disc_no
-        );
-    }
+    pub fn artist_initial_char(&self) -> Vec<char> {
+        let initials: BTreeSet<char> = self
+            .artists
+            .values()
+            .filter_map(|artist| {
+                artist
+                    ._id
+                    .0
+                    .chars()
+                    .next()
+                    .map(|c| c.to_uppercase().next().unwrap_or(c))
+            })
+            .collect();
 
-    for (i, (_album_id, album)) in lib.albums.iter().enumerate() {
-        if i == 10 {
-            break;
-        }
-        println!("Album: {}, Year: {:?}", album.title, album.year);
+        initials.into_iter().collect()
     }
 }
