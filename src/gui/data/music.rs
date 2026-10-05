@@ -30,6 +30,18 @@ pub struct AlbumId {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ArtistNameAsId(pub String);
 
+impl ArtistNameAsId {
+    pub fn new(name: &String) -> Self {
+        let name = name.trim();
+
+        if name.is_empty() {
+            Self("Unknown Artist".to_string())
+        } else {
+            Self(name.to_string())
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Song {
     // File
@@ -104,7 +116,7 @@ impl Library {
     pub fn populate_fields(lib: &mut Self, metadata_list: &Vec<Metadata>) {
         for elem in metadata_list {
             let song_id = SongId(Uuid::now_v7());
-            let artist_id = ArtistNameAsId(elem.album_artist.clone());
+            let artist_id = ArtistNameAsId::new(&elem.album_artist);
             let album_id = AlbumId {
                 album_artist: artist_id.clone(),
                 title: elem.album.clone(),
@@ -191,10 +203,10 @@ pub struct TrackSummary {
 /// Display data of an album with its tracks, detached from `Library`
 #[derive(Debug, Clone)]
 pub struct AlbumSummary {
-    pub title: String,
+    pub _title: String,
     pub album_artist: ArtistNameAsId,
-    pub year: Option<u16>,
-    pub total_duration: Option<Duration>,
+    pub _year: Option<u16>,
+    pub _total_duration: Option<Duration>,
     pub tracks: Vec<TrackSummary>,
 }
 
@@ -215,10 +227,10 @@ impl Library {
             .collect();
 
         Some(AlbumSummary {
-            title: album._title.clone(),
+            _title: album._title.clone(),
             album_artist: album._album_artist.clone(),
-            year: album._year.filter(|y| *y != 0),
-            total_duration: tracks
+            _year: album._year.filter(|y| *y != 0),
+            _total_duration: tracks
                 .iter()
                 .filter_map(|t| t.duration)
                 .reduce(|a, b| a + b),

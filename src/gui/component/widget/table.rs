@@ -387,9 +387,14 @@ where
 
         // 4. Draw Row Dividers (Horizontal)
         let mut current_y = header_height;
-        for _ in &self.rows {
+        for (i, _) in self.rows.iter().enumerate() {
             if let Some(row_layout) = layout_children.next() {
                 current_y += row_layout.bounds().height;
+
+                // Don't draw a line after the last row
+                if i == self.rows.len() - 1 {
+                    continue;
+                }
 
                 renderer.fill_quad(
                     Quad {

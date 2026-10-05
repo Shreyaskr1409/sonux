@@ -7,7 +7,7 @@ use iced::widget::{
     Column, PaneGrid, button, column, container, grid, pane_grid, responsive, row, rule,
     scrollable, space, text, text_editor,
 };
-use iced::{Alignment, Background, Task, Theme};
+use iced::{Alignment, Background, Padding, Task, Theme};
 use iced::{Element, Length::Fill};
 
 use crate::Message;
@@ -75,7 +75,10 @@ impl InitialFilter {
     fn matches(&self, artist: &ArtistNameAsId) -> bool {
         match self {
             InitialFilter::All => true,
-            InitialFilter::Initial(c) => artist.0.to_uppercase().chars().next() == Some(*c),
+            InitialFilter::Initial(c) => {
+                (artist.0.to_lowercase().chars().next() == Some(*c))
+                    || (artist.0.to_uppercase().chars().next() == Some(*c))
+            }
         }
     }
 }
@@ -94,16 +97,10 @@ struct PaneState {
 struct TracklistTableState {
     column_widths: Vec<f32>,
     headers: Vec<String>,
-    data: Vec<Vec<String>>,
 }
 
 impl TracklistTableState {
     fn placeholder() -> Self {
-        let row = vec![
-            "1".to_string(),
-            "Yes! I Am a Long Way From Home".to_string(),
-            "3:20".to_string(),
-        ];
         Self {
             column_widths: vec![100.0, 500.0, 120.0],
             headers: vec![
@@ -111,7 +108,6 @@ impl TracklistTableState {
                 "Title".to_string(),
                 "Duration".to_string(),
             ],
-            data: vec![row; 11],
         }
     }
 }
@@ -123,24 +119,11 @@ struct TextboxState {
     text_editor_content: text_editor::Content,
 }
 
-/// Precomputed vertical placement of an album entry in the track selection pane,
-/// used to only build widgets for albums that are currently visible.
-#[derive(Debug)]
-struct AlbumLayout {
-    top: f32,
-    height: f32,
-    album_height: f32,
-    heading: bool,
-}
-
 /// State container for the main content pane, housing the tracklist table and albums list.
 #[derive(Debug)]
 struct MainPaneState {
     table_state: TracklistTableState,
     albums: Vec<AlbumSummary>,
-    layout: Vec<AlbumLayout>,
-    scroll_y: f32,
-    viewport_height: f32,
 }
 
 /// State container for the sidebar filter pane, tracking artist filters and artists
@@ -156,9 +139,9 @@ struct SidePaneState {
 /// Now Playing information store
 #[derive(Debug)]
 struct NowPlayingState {
-    song: SongId,
-    album: AlbumId,
-    album_artist: ArtistNameAsId,
+    _song: SongId,
+    _album: AlbumId,
+    _album_artist: ArtistNameAsId,
 }
 
 /// The root state and view manager for the music library interface.
@@ -168,7 +151,7 @@ pub struct LibraryView {
     pane_state: pane_grid::State<PaneState>,
     side_pane_state: SidePaneState,
     main_pane_state: MainPaneState,
-    now_playing_state: Option<NowPlayingState>,
+    _now_playing_state: Option<NowPlayingState>,
 }
 
 impl Default for LibraryView {
@@ -179,9 +162,6 @@ impl Default for LibraryView {
             main_pane_state: MainPaneState {
                 table_state: TracklistTableState::placeholder(),
                 albums: Vec::new(),
-                layout: Vec::new(),
-                scroll_y: 0.0,
-                viewport_height: 1000.0,
             },
             side_pane_state: SidePaneState {
                 artist_filter_char_list: Vec::new(),
@@ -192,7 +172,7 @@ impl Default for LibraryView {
                     text_editor_content: text_editor::Content::new(),
                 },
             },
-            now_playing_state: None,
+            _now_playing_state: None,
         }
     }
 }
@@ -323,6 +303,12 @@ impl LibraryView {
             .iter()
             .filter_map(|id| library.album_summary(id))
             .collect();
+        self.main_pane_state.albums.sort_by(|a, b| {
+            a.album_artist
+                .0
+                .to_lowercase()
+                .cmp(&b.album_artist.0.to_lowercase())
+        });
         ().into()
     }
 
@@ -415,13 +401,35 @@ fn grouped_layout_view<'a>(
     .into()
 }
 
+/// Albums are expected to arrive sorted by album artist, so each artist gets one heading
+fn tracklist_selection_pane(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
+    let mut content = Column::new()
+        .spacing(4)
+        .padding(Padding::new(0.0).top(8).bottom(4));
+    let mut current_artist: Option<&ArtistNameAsId> = None;
+
+    for album in &library_view.main_pane_state.albums {
+        if current_artist != Some(&album.album_artist) {
+            content = content.push(container(text(&album.album_artist.0).size(18)).padding(2));
+            current_artist = Some(&album.album_artist);
+        }
+        content = content.push(album_content(library_view, album));
+        content = content.push(horizontal(1));
+    }
+
+    scrollable(container(content).width(Fill))
+        .direction(scrollable::Direction::Vertical(scrollable::Scrollbar::new()))
+        .into()
+}
+
+/// Called by tracklist_selection_pane(), contains content for each album
 fn album_content<'a>(
     library_view: &'a LibraryView,
     album: &'a AlbumSummary,
 ) -> Element<'a, LibraryMessage> {
     container(
         row![
-            album_content_left_bar(library_view),
+            album_content_left_bar(library_view, album),
             vertical(1),
             album_content_right_bar(library_view, album),
         ]
@@ -431,26 +439,6 @@ fn album_content<'a>(
     .height(Shrink)
     .width(Fill)
     .into()
-}
-
-/// Albums are expected to arrive sorted by album artist, so each artist gets one heading
-fn tracklist_selection_pane(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
-    let mut content = Column::new().spacing(4);
-    let mut current_artist: Option<&ArtistNameAsId> = None;
-
-    for album in &library_view.main_pane_state.albums {
-        if current_artist == Some(&album.album_artist) {
-            content = content.push(horizontal(1));
-        } else {
-            content = content.push(container(text(&album.album_artist.0).size(18)).padding(6));
-            current_artist = Some(&album.album_artist);
-        }
-        content = content.push(album_content(library_view, album));
-    }
-
-    scrollable(container(content).width(Fill))
-        .direction(scrollable::Direction::Vertical(scrollable::Scrollbar::new()))
-        .into()
 }
 
 /// Formats as `m:ss`, or `h:mm:ss` for an hour or longer
@@ -464,23 +452,44 @@ fn format_duration(duration: Duration) -> String {
     }
 }
 
-fn album_content_left_bar(_library_view: &LibraryView) -> Element<'static, LibraryMessage> {
+const LEFT_BAR_CONTENT_WIDTH: f32 = 200.00;
+
+/// Left bar would display basic album information
+fn album_content_left_bar<'a>(
+    _: &'a LibraryView,
+    album: &'a AlbumSummary,
+) -> Element<'a, LibraryMessage> {
+    let mut info = column![
+        text(&album._title).size(18).width(LEFT_BAR_CONTENT_WIDTH),
+        text(&album.album_artist.0)
+            .size(14)
+            .width(LEFT_BAR_CONTENT_WIDTH),
+    ];
+
+    if let Some(year) = album._year {
+        info = info.push(text(year.to_string()).size(14));
+    } else {
+        info = info.push(text("1998").size(14));
+    }
+
+    if let Some(duration) = album._total_duration {
+        info = info.push(text(format_duration(duration)).size(14));
+    } else {
+        info = info.push(text("1:04:38").size(14));
+    }
+
     column![
         container(space())
             .style(base_bg_container_style)
-            .width(200)
-            .height(200),
-        column![
-            text("Young Team").size(18),
-            text("Mogwai").size(14),
-            text("1997").size(14),
-            text("1:05:02").size(14),
-        ],
+            .width(LEFT_BAR_CONTENT_WIDTH)
+            .height(LEFT_BAR_CONTENT_WIDTH),
+        info,
     ]
     .spacing(8)
     .into()
 }
 
+/// Component for tracklist table
 fn tracklist_table<'a>(
     library_view: &'a LibraryView,
     album: &'a AlbumSummary,
@@ -514,6 +523,7 @@ fn tracklist_table<'a>(
     container(table).into()
 }
 
+/// Right bar would contain tracklist table with responsive sizing
 fn album_content_right_bar<'a>(
     library_view: &'a LibraryView,
     album: &'a AlbumSummary,
