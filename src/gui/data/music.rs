@@ -74,13 +74,13 @@ impl Album {
 
 #[derive(Debug)]
 pub struct Artist {
-    pub _id: ArtistNameAsId,
+    pub id: ArtistNameAsId,
 }
 
 impl Artist {
     pub fn new(name: String) -> Artist {
         Artist {
-            _id: ArtistNameAsId(name),
+            id: ArtistNameAsId(name),
         }
     }
 }
@@ -150,7 +150,7 @@ impl Library {
         songs
     }
 
-    pub fn _albums_for_artists(&self, artist_ids: &[&ArtistNameAsId]) -> Vec<AlbumId> {
+    pub fn albums_for_artists(&self, artist_ids: &[&ArtistNameAsId]) -> Vec<AlbumId> {
         let mut albums: Vec<AlbumId> = self
             .albums
             .iter()
@@ -168,7 +168,7 @@ impl Library {
             .values()
             .filter_map(|artist| {
                 artist
-                    ._id
+                    .id
                     .0
                     .chars()
                     .next()

@@ -1,5 +1,4 @@
 use iced::Length::Shrink;
-use iced::widget::pane_grid::Target;
 use iced::widget::rule::{horizontal, vertical};
 use iced::widget::{
     Column, PaneGrid, button, column, container, grid, pane_grid, responsive, row, rule,
@@ -21,6 +20,7 @@ use crate::query::scan_folders;
 pub enum OnClickEffect {
     #[default]
     Undefined,
+    AlbumFilter(ActiveAlbumFilter),
     ArtistFilter(InitialFilter),
 }
 
@@ -35,6 +35,14 @@ pub enum LibraryMessage {
 }
 
 // ----UI States Enums----
+
+/// Selected artist in SidePane
+#[derive(Debug, Default, Clone)]
+pub enum ActiveAlbumFilter {
+    #[default]
+    AllFilteredArtists,
+    ArtistWithID(ArtistNameAsId),
+}
 
 /// For distinction in the layout of library content
 #[derive(Debug, Default)]
@@ -69,15 +77,6 @@ impl InitialFilter {
     }
 }
 
-/// Selected artist in SidePane
-#[derive(Debug, Default)]
-pub enum ActiveArtist {
-    #[default]
-    AllArtists,
-    AllFilteredArtists,
-    ArtistWithID(ArtistNameAsId),
-}
-
 // ----UI States----
 
 /// Represents the configuration and title of an individual pane within the pane grid.
@@ -89,14 +88,19 @@ struct PaneState {
 
 /// Stores state variables, headers, data, and column widths for the tracklist table.
 #[derive(Debug)]
-struct TableState {
+struct TracklistTableState {
     column_widths: Vec<f32>,
     headers: Vec<String>,
     data: Vec<Vec<String>>,
 }
 
-impl TableState {
-    fn new() -> Self {
+impl TracklistTableState {
+    fn placeholder() -> Self {
+        let row = vec![
+            "1".to_string(),
+            "Yes! I Am a Long Way From Home".to_string(),
+            "3:20".to_string(),
+        ];
         Self {
             column_widths: vec![100.0, 500.0, 120.0],
             headers: vec![
@@ -104,63 +108,7 @@ impl TableState {
                 "Title".to_string(),
                 "Duration".to_string(),
             ],
-            data: vec![
-                vec![
-                    "1".into(),
-                    "Yes! I Am a Long Way From Home".into(),
-                    "3:20".into(),
-                ],
-                vec![
-                    "1".into(),
-                    "Yes! I Am a Long Way From Home".into(),
-                    "3:20".into(),
-                ],
-                vec![
-                    "1".into(),
-                    "Yes! I Am a Long Way From Home".into(),
-                    "3:20".into(),
-                ],
-                vec![
-                    "1".into(),
-                    "Yes! I Am a Long Way From Home".into(),
-                    "3:20".into(),
-                ],
-                vec![
-                    "1".into(),
-                    "Yes! I Am a Long Way From Home".into(),
-                    "3:20".into(),
-                ],
-                vec![
-                    "1".into(),
-                    "Yes! I Am a Long Way From Home".into(),
-                    "3:20".into(),
-                ],
-                vec![
-                    "1".into(),
-                    "Yes! I Am a Long Way From Home".into(),
-                    "3:20".into(),
-                ],
-                vec![
-                    "1".into(),
-                    "Yes! I Am a Long Way From Home".into(),
-                    "3:20".into(),
-                ],
-                vec![
-                    "1".into(),
-                    "Yes! I Am a Long Way From Home".into(),
-                    "3:20".into(),
-                ],
-                vec![
-                    "1".into(),
-                    "Yes! I Am a Long Way From Home".into(),
-                    "3:20".into(),
-                ],
-                vec![
-                    "1".into(),
-                    "Yes! I Am a Long Way From Home".into(),
-                    "3:20".into(),
-                ],
-            ],
+            data: vec![row; 11],
         }
     }
 }
@@ -175,7 +123,7 @@ struct TextboxState {
 /// State container for the main content pane, housing the tracklist table and albums list.
 #[derive(Debug)]
 struct MainPaneState {
-    table_state: TableState,
+    table_state: TracklistTableState,
     albums: Vec<AlbumId>,
 }
 
@@ -183,9 +131,9 @@ struct MainPaneState {
 #[derive(Debug)]
 struct SidePaneState {
     artist_filter_char_list: Vec<char>,
-    artist_filter_selected_char: Option<char>,
+    active_artist_filter: InitialFilter,
     artists: Vec<ArtistNameAsId>,
-    selected_artist: ActiveArtist,
+    selected_artist: ActiveAlbumFilter,
     path_textbox_state: TextboxState,
 }
 
@@ -213,14 +161,14 @@ impl Default for LibraryView {
             view_layout: LayoutMode::GroupedLayout,
             pane_state: build_panes(),
             main_pane_state: MainPaneState {
-                table_state: TableState::new(),
+                table_state: TracklistTableState::placeholder(),
                 albums: Vec::new(),
             },
             side_pane_state: SidePaneState {
                 artist_filter_char_list: Vec::new(),
-                artist_filter_selected_char: None,
+                active_artist_filter: InitialFilter::All,
                 artists: Vec::new(),
-                selected_artist: ActiveArtist::AllArtists,
+                selected_artist: ActiveAlbumFilter::AllFilteredArtists,
                 path_textbox_state: TextboxState {
                     text_editor_content: text_editor::Content::new(),
                 },
@@ -259,114 +207,148 @@ impl LibraryView {
         }
     }
 
+    pub fn on_column_resized(&mut self, index: usize, width: f32) -> Task<LibraryMessage> {
+        if let Some(w) = self
+            .main_pane_state
+            .table_state
+            .column_widths
+            .get_mut(index)
+        {
+            *w = width;
+        }
+        ().into()
+    }
+
+    pub fn on_pane_resized(&mut self, event: pane_grid::ResizeEvent) -> Task<LibraryMessage> {
+        self.pane_state.resize(event.split, event.ratio);
+        ().into()
+    }
+
+    pub fn on_pane_dragged(&mut self, event: pane_grid::DragEvent) -> Task<LibraryMessage> {
+        if let pane_grid::DragEvent::Dropped {
+            pane,
+            target: pane_grid::Target::Pane(other, _),
+        } = event
+        {
+            self.pane_state.swap(pane, other);
+        }
+        ().into()
+    }
+
+    pub fn on_scan_finished(&mut self, result: Result<String, String>) -> Task<LibraryMessage> {
+        match result {
+            Ok(resp) => {
+                match resp.as_str() {
+                    "Works" => {
+                        println!("Works");
+                    }
+                    _ => {}
+                }
+                ().into()
+            }
+            Err(_) => ().into(),
+        }
+    }
+
+    pub fn on_artist_filter_clicked(
+        &mut self,
+        library: &Library,
+        f: InitialFilter,
+    ) -> Task<LibraryMessage> {
+        match f {
+            InitialFilter::All => {
+                self.side_pane_state.active_artist_filter = InitialFilter::All;
+
+                let mut artists: Vec<&Artist> = library.artists.values().collect();
+                artists.sort_by(|a, b| a.id.0.to_lowercase().cmp(&b.id.0.to_lowercase()));
+
+                self.side_pane_state.artists = artists.into_iter().map(|a| a.id.clone()).collect();
+                ().into()
+            }
+            InitialFilter::Initial(c) => {
+                self.side_pane_state.active_artist_filter = InitialFilter::Initial(c);
+
+                let mut artists: Vec<&Artist> = library
+                    .artists
+                    .values()
+                    .filter(|a| a.id.0.to_uppercase().chars().next().eq(&Some(c)))
+                    .collect();
+                artists.sort_by(|a, b| a.id.0.to_lowercase().cmp(&b.id.0.to_lowercase()));
+
+                self.side_pane_state.artists = artists.into_iter().map(|a| a.id.clone()).collect();
+                ().into()
+            }
+        }
+    }
+
+    pub fn on_artist_clicked(
+        &mut self,
+        library: &Library,
+        artist_clicked: ActiveAlbumFilter,
+    ) -> Task<LibraryMessage> {
+        self.side_pane_state.selected_artist = artist_clicked.clone();
+        let mut filtered_albums: Vec<AlbumId> = match artist_clicked {
+            ActiveAlbumFilter::ArtistWithID(id) => library.albums_for_artists(&[&id]),
+
+            ActiveAlbumFilter::AllFilteredArtists => {
+                let matching_artists: Vec<&ArtistNameAsId> = self.side_pane_state.artists.iter().collect();
+                // let matching_artists: Vec<&ArtistNameAsId> =
+                //     match self.side_pane_state.active_artist_filter {
+                //         InitialFilter::All => library.artists.keys().collect(),
+                //         InitialFilter::Initial(c) => {
+                //             let target_char = c.to_lowercase().next();
+                //             library
+                //                 .artists
+                //                 .keys()
+                //                 .filter(|artist| {
+                //                     artist
+                //                         .0
+                //                         .chars()
+                //                         .next()
+                //                         .and_then(|ch| ch.to_lowercase().next())
+                //                         == target_char
+                //                 })
+                //                 .collect()
+                //         }
+                //     };
+
+                library.albums_for_artists(&matching_artists)
+            }
+        };
+
+        filtered_albums.sort_by(|a, b| {
+            a.title
+                .to_lowercase()
+                .cmp(&b.title.to_lowercase())
+                .then_with(|| {
+                    a.album_artist
+                        .0
+                        .to_lowercase()
+                        .cmp(&b.album_artist.0.to_lowercase())
+                })
+        });
+
+        self.main_pane_state.albums = filtered_albums;
+        ().into()
+    }
+
     pub fn update(&mut self, message: LibraryMessage, library: &Library) -> Task<LibraryMessage> {
         match message {
             LibraryMessage::ColumnResized(index, new_width) => {
-                if let Some(w) = self
-                    .main_pane_state
-                    .table_state
-                    .column_widths
-                    .get_mut(index)
-                {
-                    *w = new_width;
-                }
-                ().into()
+                self.on_column_resized(index, new_width)
             }
-
-            LibraryMessage::PaneResized(pane_grid::ResizeEvent { split, ratio }) => {
-                self.pane_state.resize(split, ratio);
-                ().into()
-            }
-
-            LibraryMessage::PaneDragged(pane_grid::DragEvent::Dropped { pane, target }) => {
-                if let Target::Pane(other, _) = target {
-                    self.pane_state.swap(pane, other);
-                }
-                // self.pane_state.swap(pane, target);
-                ().into()
-            }
+            LibraryMessage::PaneResized(event) => self.on_pane_resized(event),
+            LibraryMessage::PaneDragged(event) => self.on_pane_dragged(event),
 
             LibraryMessage::ScanRequested => {
                 Task::perform(scan_folders(), LibraryMessage::ScanFinished)
             }
+            LibraryMessage::ScanFinished(result) => self.on_scan_finished(result),
 
-            LibraryMessage::ScanFinished(result) => match result {
-                Ok(resp) => {
-                    match resp.as_str() {
-                        "Works" => {
-                            println!("Works");
-                        }
-                        _ => {}
-                    }
-                    ().into()
-                }
-                Err(_) => ().into(),
-            },
-
-            LibraryMessage::PaneDragged(_) => ().into(),
             LibraryMessage::ButtonPressed(effect) => match effect {
-                OnClickEffect::Undefined => {
-                    self.side_pane_state.artists = match self.side_pane_state.selected_artist {
-                        ActiveArtist::AllArtists => {
-                            let mut artists: Vec<&Artist> = library.artists.values().collect();
-                            artists.sort_by(|a, b| {
-                                a._id.0.to_lowercase().cmp(&b._id.0.to_lowercase())
-                            });
-
-                            let artist_ids: Vec<ArtistNameAsId> =
-                                artists.into_iter().map(|a| a._id.clone()).collect();
-                            artist_ids
-                        }
-
-                        ActiveArtist::AllFilteredArtists | ActiveArtist::ArtistWithID(_) => {
-                            let mut artists: Vec<&Artist> = library
-                                .artists
-                                .values()
-                                .filter(|a| {
-                                    a._id
-                                        .0
-                                        .chars()
-                                        .next()
-                                        .eq(&self.side_pane_state.artist_filter_selected_char)
-                                })
-                                .collect();
-                            artists.sort_by(|a, b| {
-                                a._id.0.to_lowercase().cmp(&b._id.0.to_lowercase())
-                            });
-
-                            let artist_ids: Vec<ArtistNameAsId> =
-                                artists.into_iter().map(|a| a._id.clone()).collect();
-                            artist_ids
-                        }
-                    };
-                    ().into()
-                }
-                OnClickEffect::ArtistFilter(f) => match f {
-                    InitialFilter::All => {
-                        self.side_pane_state.artist_filter_selected_char = None;
-
-                        let mut artists: Vec<&Artist> = library.artists.values().collect();
-                        artists.sort_by(|a, b| a._id.0.to_lowercase().cmp(&b._id.0.to_lowercase()));
-
-                        self.side_pane_state.artists =
-                            artists.into_iter().map(|a| a._id.clone()).collect();
-                        ().into()
-                    }
-                    InitialFilter::Initial(c) => {
-                        self.side_pane_state.artist_filter_selected_char = Some(c);
-
-                        let mut artists: Vec<&Artist> = library
-                            .artists
-                            .values()
-                            .filter(|a| a._id.0.chars().next().eq(&Some(c)))
-                            .collect();
-                        artists.sort_by(|a, b| a._id.0.to_lowercase().cmp(&b._id.0.to_lowercase()));
-
-                        self.side_pane_state.artists =
-                            artists.into_iter().map(|a| a._id.clone()).collect();
-                        ().into()
-                    }
-                },
+                OnClickEffect::Undefined => ().into(),
+                OnClickEffect::AlbumFilter(f) => self.on_artist_clicked(library, f),
+                OnClickEffect::ArtistFilter(f) => self.on_artist_filter_clicked(library, f),
             },
         }
     }
@@ -375,9 +357,9 @@ impl LibraryView {
         self.side_pane_state.artist_filter_char_list = library.artist_initial_char();
 
         let mut artists: Vec<&Artist> = library.artists.values().collect();
-        artists.sort_by(|a, b| a._id.0.to_lowercase().cmp(&b._id.0.to_lowercase()));
+        artists.sort_by(|a, b| a.id.0.to_lowercase().cmp(&b.id.0.to_lowercase()));
 
-        self.side_pane_state.artists = artists.into_iter().map(|a| a._id.clone()).collect();
+        self.side_pane_state.artists = artists.into_iter().map(|a| a.id.clone()).collect();
     }
 }
 
@@ -558,21 +540,6 @@ fn filter_sidebar_view<'a>(
     library_view: &'a LibraryView,
     library: &'a Library,
 ) -> Element<'a, LibraryMessage> {
-    // let initial_chars = library.artist_initial_char();
-    // let char_buttons: Vec<Element<'_, LibraryMessage>> = initial_chars
-    //     .into_iter()
-    //     .map(|c| {
-    //         button(text(c.to_string()))
-    //             // .on_press(LibraryMessage::ButtonPressed(ButtonEffect::ArtistFilter(
-    //             //     SelectedArtistFilterChar::AllArtists,
-    //             // )))
-    //             .on_press(LibraryMessage::ButtonPressed(ButtonEffect::ArtistFilter(
-    //                 SelectedArtistFilterChar::CertainChar(c),
-    //             )))
-    //             .into()
-    //     })
-    //     .collect();
-
     let initial_chars = library.artist_initial_char();
 
     // Start the vector with the '*' button
@@ -583,7 +550,6 @@ fn filter_sidebar_view<'a>(
             )))
             .into(),
     ];
-
     // Extend it with the mapped initial characters
     char_buttons.extend(initial_chars.into_iter().map(|c| {
         button(text(c.to_string()))
@@ -593,42 +559,48 @@ fn filter_sidebar_view<'a>(
             .into()
     }));
 
-    let artist_buttons: Vec<Element<'_, LibraryMessage>> = library_view
-        .side_pane_state
-        .artists
-        .iter()
-        .map(|a| {
-            listing_button(
-                &a.0,
-                LibraryMessage::ButtonPressed(OnClickEffect::Undefined),
-            )
-            .into()
-        })
-        .collect();
+    // Start the vector with the 'show all' button
+    let mut artist_buttons: Vec<Element<'_, LibraryMessage>> = vec![
+        listing_button(
+            "(show all)",
+            LibraryMessage::ButtonPressed(OnClickEffect::AlbumFilter(
+                ActiveAlbumFilter::AllFilteredArtists,
+            )),
+        )
+        .into(),
+    ];
+    // Extend it with the filtered artists
+    artist_buttons.extend(library_view.side_pane_state.artists.iter().map(|a| {
+        listing_button(
+            &a.0,
+            LibraryMessage::ButtonPressed(OnClickEffect::AlbumFilter(
+                ActiveAlbumFilter::ArtistWithID(a.clone()),
+            )),
+        )
+        .into()
+    }));
 
     column![
-        scrollable(
-            container(
-                column![
-                    container(grid(char_buttons).fluid(40).spacing(4)),
-                    rule::horizontal(1),
-                    Column::with_children(artist_buttons).spacing(4),
-                ]
-                .spacing(4),
-            )
-            .padding(4)
-            .style(|theme: &Theme| {
-                let _palette = theme.extended_palette();
-                container::Style {
-                    background: Some(Background::Color(_palette.background.base.color)),
-                    ..container::rounded_box(theme)
-                }
-            })
-            .height(Fill)
+        container(
+            column![
+                container(grid(char_buttons).fluid(40).spacing(4)),
+                rule::horizontal(1),
+                scrollable(Column::with_children(artist_buttons).spacing(4))
+                    .direction(scrollable::Direction::Vertical(
+                        scrollable::Scrollbar::new().spacing(5)
+                    ))
+                    .height(Fill),
+            ]
+            .spacing(4),
         )
-        .direction(scrollable::Direction::Vertical(
-            scrollable::Scrollbar::new().spacing(5)
-        ))
+        .padding(4)
+        .style(|theme: &Theme| {
+            let _palette = theme.extended_palette();
+            container::Style {
+                background: Some(Background::Color(_palette.background.base.color)),
+                ..container::rounded_box(theme)
+            }
+        })
         .height(Fill),
         row![
             text("Search paths")
