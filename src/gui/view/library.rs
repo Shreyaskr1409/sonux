@@ -15,62 +15,70 @@ use crate::component::widget::table::ResizableTable;
 use crate::data::music::{AlbumId, Artist, ArtistNameAsId, Library, SongId};
 use crate::query::scan_folders;
 
-// For distinction in the layout of library content
+// ----Messages----
+
+#[derive(Debug, Default, Clone)]
+pub enum OnClickEffect {
+    #[default]
+    Undefined,
+    ArtistFilter(InitialFilter),
+}
+
+#[derive(Debug, Clone)]
+pub enum LibraryMessage {
+    ColumnResized(usize, f32),
+    PaneResized(pane_grid::ResizeEvent),
+    PaneDragged(pane_grid::DragEvent),
+    ButtonPressed(OnClickEffect),
+    ScanRequested,
+    ScanFinished(Result<String, String>),
+}
+
+// ----UI States Enums----
+
+/// For distinction in the layout of library content
 #[derive(Debug, Default)]
-enum ViewLayout {
+enum LayoutMode {
     #[default]
     GroupedLayout,
     _TableLayout, // not implemented yet
 }
 
-// For distinction in the type of content the pane contains
+/// For distinction in the type of content the pane contains
 #[derive(Debug)]
 enum PaneType {
     Sidebar,
-    Main,
+    TrackSelection,
 }
 
-// Selected artist in SidePane
+/// Selected artist filter char in SidePane
+#[derive(Debug, Default, Clone)]
+pub enum InitialFilter {
+    #[default]
+    All,
+    Initial(char),
+}
+
+impl InitialFilter {
+    /// Tells if the artist pass through given filter
+    fn matches(&self, artist: &ArtistNameAsId) -> bool {
+        match self {
+            InitialFilter::All => true,
+            InitialFilter::Initial(c) => artist.0.chars().next() == Some(*c),
+        }
+    }
+}
+
+/// Selected artist in SidePane
 #[derive(Debug, Default)]
-enum SelectedArtist {
+pub enum ActiveArtist {
     #[default]
     AllArtists,
     AllFilteredArtists,
     ArtistWithID(ArtistNameAsId),
 }
 
-// Selected artist filter char in SidePane
-#[derive(Debug, Default, Clone)]
-enum SelectedArtistFilterChar {
-    #[default]
-    AllArtists,
-    CertainChar(char),
-}
-
-// Now Playing information store
-#[derive(Debug)]
-struct NowPlayingState {
-    song: SongId,
-    album: AlbumId,
-    album_artist: ArtistNameAsId,
-}
-
-/// State container for the main content pane, housing the tracklist table and albums list.
-#[derive(Debug)]
-struct MainPaneState {
-    table_state: TableState,
-    albums: Vec<AlbumId>,
-}
-
-/// State container for the sidebar filter pane, tracking artist filters and artists
-#[derive(Debug)]
-struct SidePaneState {
-    artist_filter_char_list: Vec<char>,
-    artist_filter_selected_char: Option<char>,
-    artists: Vec<ArtistNameAsId>,
-    selected_artist: SelectedArtist,
-    path_textbox_state: TextboxState,
-}
+// ----UI States----
 
 /// Represents the configuration and title of an individual pane within the pane grid.
 #[derive(Debug)]
@@ -85,56 +93,6 @@ struct TableState {
     column_widths: Vec<f32>,
     headers: Vec<String>,
     data: Vec<Vec<String>>,
-}
-
-// Needs renaming later on
-// To store "newline" separated paths to scan for music
-#[derive(Debug)]
-struct TextboxState {
-    text_editor_content: text_editor::Content,
-}
-
-/// The root state and view manager for the music library interface.
-#[derive(Debug)]
-pub struct LibraryView {
-    view_layout: ViewLayout,
-    pane_state: pane_grid::State<PaneState>,
-    side_pane_state: SidePaneState,
-    main_pane_state: MainPaneState,
-    now_playing_state: Option<NowPlayingState>,
-}
-
-#[derive(Debug, Default, Clone)]
-pub enum ButtonEffect {
-    #[default]
-    Undefined,
-    ArtistFilter(SelectedArtistFilterChar),
-}
-
-#[derive(Debug, Clone)]
-pub enum LibraryMessage {
-    ColumnResized(usize, f32),
-    PaneResized(pane_grid::ResizeEvent),
-    PaneDragged(pane_grid::DragEvent),
-    ButtonPressed(ButtonEffect),
-    FileScanInitiate,
-    FileScanEnds(Result<String, String>),
-}
-
-pub fn player_library<'a>(
-    library_view: &'a LibraryView,
-    library: &'a Library,
-) -> Element<'a, Message> {
-    column![
-        container(column![
-            LibraryView::view(&library_view, &library).map(Message::Library)
-        ])
-        .width(Fill)
-        .height(Fill)
-        .padding(4)
-        .style(container::bordered_box),
-    ]
-    .into()
 }
 
 impl TableState {
@@ -207,27 +165,53 @@ impl TableState {
     }
 }
 
+// Needs renaming later on
+/// To store "newline" separated paths to scan for music
+#[derive(Debug)]
+struct TextboxState {
+    text_editor_content: text_editor::Content,
+}
+
+/// State container for the main content pane, housing the tracklist table and albums list.
+#[derive(Debug)]
+struct MainPaneState {
+    table_state: TableState,
+    albums: Vec<AlbumId>,
+}
+
+/// State container for the sidebar filter pane, tracking artist filters and artists
+#[derive(Debug)]
+struct SidePaneState {
+    artist_filter_char_list: Vec<char>,
+    artist_filter_selected_char: Option<char>,
+    artists: Vec<ArtistNameAsId>,
+    selected_artist: ActiveArtist,
+    path_textbox_state: TextboxState,
+}
+
+/// Now Playing information store
+#[derive(Debug)]
+struct NowPlayingState {
+    song: SongId,
+    album: AlbumId,
+    album_artist: ArtistNameAsId,
+}
+
+/// The root state and view manager for the music library interface.
+#[derive(Debug)]
+pub struct LibraryView {
+    view_layout: LayoutMode,
+    pane_state: pane_grid::State<PaneState>,
+    side_pane_state: SidePaneState,
+    main_pane_state: MainPaneState,
+    now_playing_state: Option<NowPlayingState>,
+}
+
 impl Default for LibraryView {
     fn default() -> Self {
-        let (mut pane_state, sidebar_pane_id) = pane_grid::State::new(PaneState {
-            pane_type: PaneType::Sidebar,
-            title: "Filter".into(),
-        });
-
-        if let Some((_main_pane_id, split)) = pane_state.split(
-            pane_grid::Axis::Vertical,
-            sidebar_pane_id, // TODO: put ids into PaneState
-            PaneState {
-                pane_type: PaneType::Main,
-                title: "Library".into(),
-            },
-        ) {
-            pane_state.resize(split, 0.2);
-        }
-
         Self {
-            view_layout: ViewLayout::GroupedLayout,
-            pane_state: pane_state,
+            view_layout: LayoutMode::GroupedLayout,
+            pane_state: build_panes(),
             main_pane_state: MainPaneState {
                 table_state: TableState::new(),
                 albums: Vec::new(),
@@ -236,7 +220,7 @@ impl Default for LibraryView {
                 artist_filter_char_list: Vec::new(),
                 artist_filter_selected_char: None,
                 artists: Vec::new(),
-                selected_artist: SelectedArtist::AllArtists,
+                selected_artist: ActiveArtist::AllArtists,
                 path_textbox_state: TextboxState {
                     text_editor_content: text_editor::Content::new(),
                 },
@@ -246,11 +230,32 @@ impl Default for LibraryView {
     }
 }
 
+/// Build initial panes for LibraryView
+fn build_panes() -> pane_grid::State<PaneState> {
+    let (mut pane_state, sidebar_pane_id) = pane_grid::State::new(PaneState {
+        pane_type: PaneType::Sidebar,
+        title: "Filter".into(),
+    });
+
+    if let Some((_main_pane_id, split)) = pane_state.split(
+        pane_grid::Axis::Vertical,
+        sidebar_pane_id, // TODO: put ids into PaneState
+        PaneState {
+            pane_type: PaneType::TrackSelection,
+            title: "Library".into(),
+        },
+    ) {
+        pane_state.resize(split, 0.2);
+    }
+
+    pane_state
+}
+
 impl LibraryView {
     pub fn view<'a>(&'a self, library: &'a Library) -> Element<'a, LibraryMessage> {
         match self.view_layout {
-            ViewLayout::GroupedLayout => grouped_layout_view(self, library),
-            ViewLayout::_TableLayout => space().into(),
+            LayoutMode::GroupedLayout => grouped_layout_view(self, library),
+            LayoutMode::_TableLayout => space().into(),
         }
     }
 
@@ -281,11 +286,11 @@ impl LibraryView {
                 ().into()
             }
 
-            LibraryMessage::FileScanInitiate => {
-                Task::perform(scan_folders(), LibraryMessage::FileScanEnds)
+            LibraryMessage::ScanRequested => {
+                Task::perform(scan_folders(), LibraryMessage::ScanFinished)
             }
 
-            LibraryMessage::FileScanEnds(result) => match result {
+            LibraryMessage::ScanFinished(result) => match result {
                 Ok(resp) => {
                     match resp.as_str() {
                         "Works" => {
@@ -300,9 +305,9 @@ impl LibraryView {
 
             LibraryMessage::PaneDragged(_) => ().into(),
             LibraryMessage::ButtonPressed(effect) => match effect {
-                ButtonEffect::Undefined => {
+                OnClickEffect::Undefined => {
                     self.side_pane_state.artists = match self.side_pane_state.selected_artist {
-                        SelectedArtist::AllArtists => {
+                        ActiveArtist::AllArtists => {
                             let mut artists: Vec<&Artist> = library.artists.values().collect();
                             artists.sort_by(|a, b| {
                                 a._id.0.to_lowercase().cmp(&b._id.0.to_lowercase())
@@ -313,7 +318,7 @@ impl LibraryView {
                             artist_ids
                         }
 
-                        SelectedArtist::AllFilteredArtists | SelectedArtist::ArtistWithID(_) => {
+                        ActiveArtist::AllFilteredArtists | ActiveArtist::ArtistWithID(_) => {
                             let mut artists: Vec<&Artist> = library
                                 .artists
                                 .values()
@@ -336,8 +341,8 @@ impl LibraryView {
                     };
                     ().into()
                 }
-                ButtonEffect::ArtistFilter(f) => match f {
-                    SelectedArtistFilterChar::AllArtists => {
+                OnClickEffect::ArtistFilter(f) => match f {
+                    InitialFilter::All => {
                         self.side_pane_state.artist_filter_selected_char = None;
 
                         let mut artists: Vec<&Artist> = library.artists.values().collect();
@@ -347,7 +352,7 @@ impl LibraryView {
                             artists.into_iter().map(|a| a._id.clone()).collect();
                         ().into()
                     }
-                    SelectedArtistFilterChar::CertainChar(c) => {
+                    InitialFilter::Initial(c) => {
                         self.side_pane_state.artist_filter_selected_char = Some(c);
 
                         let mut artists: Vec<&Artist> = library
@@ -376,6 +381,22 @@ impl LibraryView {
     }
 }
 
+pub fn player_library<'a>(
+    library_view: &'a LibraryView,
+    library: &'a Library,
+) -> Element<'a, Message> {
+    column![
+        container(column![
+            LibraryView::view(&library_view, &library).map(Message::Library)
+        ])
+        .width(Fill)
+        .height(Fill)
+        .padding(4)
+        .style(container::bordered_box),
+    ]
+    .into()
+}
+
 fn grouped_layout_view<'a>(
     library_view: &'a LibraryView,
     library: &'a Library,
@@ -383,7 +404,7 @@ fn grouped_layout_view<'a>(
     // Panes
     PaneGrid::new(&library_view.pane_state, |_pane, state, _is_maximized| {
         let content = match state.pane_type {
-            PaneType::Main => library_content_view(library_view),
+            PaneType::TrackSelection => library_content_view(library_view),
             PaneType::Sidebar => filter_sidebar_view(library_view, library),
         };
 
@@ -557,8 +578,8 @@ fn filter_sidebar_view<'a>(
     // Start the vector with the '*' button
     let mut char_buttons: Vec<Element<'_, LibraryMessage>> = vec![
         button(text('*'))
-            .on_press(LibraryMessage::ButtonPressed(ButtonEffect::ArtistFilter(
-                SelectedArtistFilterChar::AllArtists,
+            .on_press(LibraryMessage::ButtonPressed(OnClickEffect::ArtistFilter(
+                InitialFilter::All,
             )))
             .into(),
     ];
@@ -566,8 +587,8 @@ fn filter_sidebar_view<'a>(
     // Extend it with the mapped initial characters
     char_buttons.extend(initial_chars.into_iter().map(|c| {
         button(text(c.to_string()))
-            .on_press(LibraryMessage::ButtonPressed(ButtonEffect::ArtistFilter(
-                SelectedArtistFilterChar::CertainChar(c),
+            .on_press(LibraryMessage::ButtonPressed(OnClickEffect::ArtistFilter(
+                InitialFilter::Initial(c),
             )))
             .into()
     }));
@@ -577,7 +598,11 @@ fn filter_sidebar_view<'a>(
         .artists
         .iter()
         .map(|a| {
-            listing_button(&a.0, LibraryMessage::ButtonPressed(ButtonEffect::Undefined)).into()
+            listing_button(
+                &a.0,
+                LibraryMessage::ButtonPressed(OnClickEffect::Undefined),
+            )
+            .into()
         })
         .collect();
 
@@ -610,7 +635,7 @@ fn filter_sidebar_view<'a>(
                 .width(Fill)
                 .height(Fill)
                 .align_y(Alignment::Center),
-            button("Scan for Music").on_press(LibraryMessage::FileScanInitiate),
+            button("Scan for Music").on_press(LibraryMessage::ScanRequested),
         ]
         .width(Fill)
         .height(Shrink),
