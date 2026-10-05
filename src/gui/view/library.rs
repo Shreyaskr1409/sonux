@@ -1,3 +1,6 @@
+use std::time::Duration;
+
+use iced::Alignment::Center;
 use iced::Length::Shrink;
 use iced::widget::rule::{horizontal, vertical};
 use iced::widget::{
@@ -11,7 +14,7 @@ use crate::Message;
 use crate::component::button::listing_button;
 use crate::component::style::base_bg_container_style;
 use crate::component::widget::table::ResizableTable;
-use crate::data::music::{AlbumId, Artist, ArtistNameAsId, Library, SongId};
+use crate::data::music::{AlbumId, AlbumSummary, Artist, ArtistNameAsId, Library, SongId};
 use crate::query::scan_folders;
 
 // ----Messages----
@@ -72,7 +75,7 @@ impl InitialFilter {
     fn matches(&self, artist: &ArtistNameAsId) -> bool {
         match self {
             InitialFilter::All => true,
-            InitialFilter::Initial(c) => artist.0.chars().next() == Some(*c),
+            InitialFilter::Initial(c) => artist.0.to_uppercase().chars().next() == Some(*c),
         }
     }
 }
@@ -120,11 +123,24 @@ struct TextboxState {
     text_editor_content: text_editor::Content,
 }
 
+/// Precomputed vertical placement of an album entry in the track selection pane,
+/// used to only build widgets for albums that are currently visible.
+#[derive(Debug)]
+struct AlbumLayout {
+    top: f32,
+    height: f32,
+    album_height: f32,
+    heading: bool,
+}
+
 /// State container for the main content pane, housing the tracklist table and albums list.
 #[derive(Debug)]
 struct MainPaneState {
     table_state: TracklistTableState,
-    albums: Vec<AlbumId>,
+    albums: Vec<AlbumSummary>,
+    layout: Vec<AlbumLayout>,
+    scroll_y: f32,
+    viewport_height: f32,
 }
 
 /// State container for the sidebar filter pane, tracking artist filters and artists
@@ -163,6 +179,9 @@ impl Default for LibraryView {
             main_pane_state: MainPaneState {
                 table_state: TracklistTableState::placeholder(),
                 albums: Vec::new(),
+                layout: Vec::new(),
+                scroll_y: 0.0,
+                viewport_height: 1000.0,
             },
             side_pane_state: SidePaneState {
                 artist_filter_char_list: Vec::new(),
@@ -200,13 +219,6 @@ fn build_panes() -> pane_grid::State<PaneState> {
 }
 
 impl LibraryView {
-    pub fn view<'a>(&'a self, library: &'a Library) -> Element<'a, LibraryMessage> {
-        match self.view_layout {
-            LayoutMode::GroupedLayout => grouped_layout_view(self, library),
-            LayoutMode::_TableLayout => space().into(),
-        }
-    }
-
     pub fn on_column_resized(&mut self, index: usize, width: f32) -> Task<LibraryMessage> {
         if let Some(w) = self
             .main_pane_state
@@ -263,7 +275,6 @@ impl LibraryView {
                 artists.sort_by(|a, b| a.id.0.to_lowercase().cmp(&b.id.0.to_lowercase()));
 
                 self.side_pane_state.artists = artists.into_iter().map(|a| a.id.clone()).collect();
-                ().into()
             }
             InitialFilter::Initial(c) => {
                 self.side_pane_state.active_artist_filter = InitialFilter::Initial(c);
@@ -271,47 +282,27 @@ impl LibraryView {
                 let mut artists: Vec<&Artist> = library
                     .artists
                     .values()
-                    .filter(|a| a.id.0.to_uppercase().chars().next().eq(&Some(c)))
+                    .filter(|a| InitialFilter::Initial(c).matches(&a.id))
                     .collect();
                 artists.sort_by(|a, b| a.id.0.to_lowercase().cmp(&b.id.0.to_lowercase()));
 
                 self.side_pane_state.artists = artists.into_iter().map(|a| a.id.clone()).collect();
-                ().into()
             }
-        }
+        };
+        self.on_artist_clicked(library, ActiveAlbumFilter::AllFilteredArtists)
     }
 
     pub fn on_artist_clicked(
         &mut self,
         library: &Library,
-        artist_clicked: ActiveAlbumFilter,
+        active_album_filter: ActiveAlbumFilter,
     ) -> Task<LibraryMessage> {
-        self.side_pane_state.selected_artist = artist_clicked.clone();
-        let mut filtered_albums: Vec<AlbumId> = match artist_clicked {
+        self.side_pane_state.selected_artist = active_album_filter.clone();
+        let mut filtered_albums: Vec<AlbumId> = match active_album_filter {
             ActiveAlbumFilter::ArtistWithID(id) => library.albums_for_artists(&[&id]),
-
             ActiveAlbumFilter::AllFilteredArtists => {
-                let matching_artists: Vec<&ArtistNameAsId> = self.side_pane_state.artists.iter().collect();
-                // let matching_artists: Vec<&ArtistNameAsId> =
-                //     match self.side_pane_state.active_artist_filter {
-                //         InitialFilter::All => library.artists.keys().collect(),
-                //         InitialFilter::Initial(c) => {
-                //             let target_char = c.to_lowercase().next();
-                //             library
-                //                 .artists
-                //                 .keys()
-                //                 .filter(|artist| {
-                //                     artist
-                //                         .0
-                //                         .chars()
-                //                         .next()
-                //                         .and_then(|ch| ch.to_lowercase().next())
-                //                         == target_char
-                //                 })
-                //                 .collect()
-                //         }
-                //     };
-
+                let matching_artists: Vec<&ArtistNameAsId> =
+                    self.side_pane_state.artists.iter().collect();
                 library.albums_for_artists(&matching_artists)
             }
         };
@@ -328,7 +319,10 @@ impl LibraryView {
                 })
         });
 
-        self.main_pane_state.albums = filtered_albums;
+        self.main_pane_state.albums = filtered_albums
+            .iter()
+            .filter_map(|id| library.album_summary(id))
+            .collect();
         ().into()
     }
 
@@ -360,9 +354,23 @@ impl LibraryView {
         artists.sort_by(|a, b| a.id.0.to_lowercase().cmp(&b.id.0.to_lowercase()));
 
         self.side_pane_state.artists = artists.into_iter().map(|a| a.id.clone()).collect();
+
+        let _ = self.on_artist_clicked(library, ActiveAlbumFilter::AllFilteredArtists);
     }
 }
 
+// ----Track Selection Section----
+
+impl LibraryView {
+    pub fn view<'a>(&'a self, library: &'a Library) -> Element<'a, LibraryMessage> {
+        match self.view_layout {
+            LayoutMode::GroupedLayout => grouped_layout_view(self, library),
+            LayoutMode::_TableLayout => space().into(),
+        }
+    }
+}
+
+/// Starting point of UI creation and includes the actual view for the library
 pub fn player_library<'a>(
     library_view: &'a LibraryView,
     library: &'a Library,
@@ -379,14 +387,15 @@ pub fn player_library<'a>(
     .into()
 }
 
+/// Called by LibraryView::view() for tracklists for each album grouped together.
+/// Responsible for initializing panes for Sidebar and TrackSelection
 fn grouped_layout_view<'a>(
     library_view: &'a LibraryView,
     library: &'a Library,
 ) -> Element<'a, LibraryMessage> {
-    // Panes
     PaneGrid::new(&library_view.pane_state, |_pane, state, _is_maximized| {
         let content = match state.pane_type {
-            PaneType::TrackSelection => library_content_view(library_view),
+            PaneType::TrackSelection => tracklist_selection_pane(library_view),
             PaneType::Sidebar => filter_sidebar_view(library_view, library),
         };
 
@@ -406,49 +415,56 @@ fn grouped_layout_view<'a>(
     .into()
 }
 
-fn library_content_view(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
-    scrollable(
-        row![
-            container(
-                column![
-                    container(text("Mogwai").size(18)).padding(6),
-                    album_content(library_view),
-                    horizontal(1),
-                    album_content(library_view),
-                    horizontal(1),
-                    album_content(library_view),
-                    horizontal(1),
-                    container(text("Mogwai").size(18)).padding(6),
-                    album_content(library_view),
-                ]
-                .spacing(4)
-            )
-            .width(Fill)
-            .padding(0),
-        ]
-        .spacing(4),
-    )
-    .direction(scrollable::Direction::Vertical(scrollable::Scrollbar::new()))
-    .into()
-}
-
-fn album_content(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
+fn album_content<'a>(
+    library_view: &'a LibraryView,
+    album: &'a AlbumSummary,
+) -> Element<'a, LibraryMessage> {
     container(
         row![
-            album_content_left_pane(library_view),
+            album_content_left_bar(library_view),
             vertical(1),
-            album_content_right_pane(library_view),
+            album_content_right_bar(library_view, album),
         ]
         .spacing(4),
     )
-    // .style(base_bg_container)
     .padding(4)
     .height(Shrink)
     .width(Fill)
     .into()
 }
 
-fn album_content_left_pane(_library_view: &LibraryView) -> Element<'static, LibraryMessage> {
+/// Albums are expected to arrive sorted by album artist, so each artist gets one heading
+fn tracklist_selection_pane(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
+    let mut content = Column::new().spacing(4);
+    let mut current_artist: Option<&ArtistNameAsId> = None;
+
+    for album in &library_view.main_pane_state.albums {
+        if current_artist == Some(&album.album_artist) {
+            content = content.push(horizontal(1));
+        } else {
+            content = content.push(container(text(&album.album_artist.0).size(18)).padding(6));
+            current_artist = Some(&album.album_artist);
+        }
+        content = content.push(album_content(library_view, album));
+    }
+
+    scrollable(container(content).width(Fill))
+        .direction(scrollable::Direction::Vertical(scrollable::Scrollbar::new()))
+        .into()
+}
+
+/// Formats as `m:ss`, or `h:mm:ss` for an hour or longer
+fn format_duration(duration: Duration) -> String {
+    let secs = duration.as_secs();
+    let (h, m, s) = (secs / 3600, (secs / 60) % 60, secs % 60);
+    if h > 0 {
+        format!("{h}:{m:02}:{s:02}")
+    } else {
+        format!("{m}:{s:02}")
+    }
+}
+
+fn album_content_left_bar(_library_view: &LibraryView) -> Element<'static, LibraryMessage> {
     column![
         container(space())
             .style(base_bg_container_style)
@@ -465,10 +481,11 @@ fn album_content_left_pane(_library_view: &LibraryView) -> Element<'static, Libr
     .into()
 }
 
-fn album_content_table(
-    library_view: &LibraryView,
+fn tracklist_table<'a>(
+    library_view: &'a LibraryView,
+    album: &'a AlbumSummary,
     effective_widths: Vec<f32>,
-) -> Element<'_, LibraryMessage> {
+) -> Element<'a, LibraryMessage> {
     let headers: Vec<Element<LibraryMessage>> = library_view
         .main_pane_state
         .table_state
@@ -477,13 +494,13 @@ fn album_content_table(
         .map(|h| container(text(h).size(20)).padding(4).width(Fill).into())
         .collect();
 
-    let rows: Vec<Vec<Element<LibraryMessage>>> = library_view
-        .main_pane_state
-        .table_state
-        .data
+    let rows: Vec<Vec<Element<LibraryMessage>>> = album
+        .tracks
         .iter()
-        .map(|row| {
-            row.iter()
+        .map(|track| {
+            let duration = track.duration.map_or("--".to_string(), format_duration);
+            [track.track_no.to_string(), track.title.clone(), duration]
+                .into_iter()
                 .map(|cell| container(text(cell).size(16)).padding(4).width(Fill).into())
                 .collect()
         })
@@ -497,7 +514,10 @@ fn album_content_table(
     container(table).into()
 }
 
-fn album_content_right_pane(library_view: &LibraryView) -> Element<'_, LibraryMessage> {
+fn album_content_right_bar<'a>(
+    library_view: &'a LibraryView,
+    album: &'a AlbumSummary,
+) -> Element<'a, LibraryMessage> {
     responsive(move |size| {
         // Account for outer padding (4 left + 4 right = 8px)
         let available_width = (size.width - 8.0).max(0.0);
@@ -522,7 +542,7 @@ fn album_content_right_pane(library_view: &LibraryView) -> Element<'_, LibraryMe
 
         scrollable(
             container(row![
-                column![album_content_table(library_view, effective_widths),].spacing(4),
+                column![tracklist_table(library_view, album, effective_widths),].spacing(4),
             ])
             .style(base_bg_container_style)
             .padding(4),
@@ -536,6 +556,8 @@ fn album_content_right_pane(library_view: &LibraryView) -> Element<'_, LibraryMe
     .into()
 }
 
+// ----Sidebar----
+
 fn filter_sidebar_view<'a>(
     library_view: &'a LibraryView,
     library: &'a Library,
@@ -544,7 +566,7 @@ fn filter_sidebar_view<'a>(
 
     // Start the vector with the '*' button
     let mut char_buttons: Vec<Element<'_, LibraryMessage>> = vec![
-        button(text('*'))
+        button(text('*').align_x(Center).align_y(Center))
             .on_press(LibraryMessage::ButtonPressed(OnClickEffect::ArtistFilter(
                 InitialFilter::All,
             )))
@@ -552,7 +574,7 @@ fn filter_sidebar_view<'a>(
     ];
     // Extend it with the mapped initial characters
     char_buttons.extend(initial_chars.into_iter().map(|c| {
-        button(text(c.to_string()))
+        button(text(c.to_string()).align_x(Center).align_y(Center))
             .on_press(LibraryMessage::ButtonPressed(OnClickEffect::ArtistFilter(
                 InitialFilter::Initial(c),
             )))
@@ -583,7 +605,7 @@ fn filter_sidebar_view<'a>(
     column![
         container(
             column![
-                container(grid(char_buttons).fluid(40).spacing(4)),
+                container(grid(char_buttons).fluid(28).spacing(4)),
                 rule::horizontal(1),
                 scrollable(Column::with_children(artist_buttons).spacing(4))
                     .direction(scrollable::Direction::Vertical(
@@ -602,6 +624,14 @@ fn filter_sidebar_view<'a>(
             }
         })
         .height(Fill),
+        text_editor(
+            &library_view
+                .side_pane_state
+                .path_textbox_state
+                .text_editor_content
+        )
+        .placeholder("Enter a path in each line")
+        .height(100),
         row![
             text("Search paths")
                 .width(Fill)
@@ -611,14 +641,6 @@ fn filter_sidebar_view<'a>(
         ]
         .width(Fill)
         .height(Shrink),
-        text_editor(
-            &library_view
-                .side_pane_state
-                .path_textbox_state
-                .text_editor_content
-        )
-        .placeholder("Enter a path in each line")
-        .height(100),
     ]
     .spacing(4)
     .into()

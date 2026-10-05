@@ -179,3 +179,50 @@ impl Library {
         initials.into_iter().collect()
     }
 }
+
+/// Display data of a track, detached from `Library`
+#[derive(Debug, Clone)]
+pub struct TrackSummary {
+    pub track_no: u16,
+    pub title: String,
+    pub duration: Option<Duration>,
+}
+
+/// Display data of an album with its tracks, detached from `Library`
+#[derive(Debug, Clone)]
+pub struct AlbumSummary {
+    pub title: String,
+    pub album_artist: ArtistNameAsId,
+    pub year: Option<u16>,
+    pub total_duration: Option<Duration>,
+    pub tracks: Vec<TrackSummary>,
+}
+
+impl Library {
+    /// Collects everything needed to display an album; tracks are ordered by disc and track number
+    pub fn album_summary(&self, album_id: &AlbumId) -> Option<AlbumSummary> {
+        let album = self.albums.get(album_id)?;
+
+        let tracks: Vec<TrackSummary> = self
+            ._songs_for_album(album_id)
+            .into_iter()
+            .filter_map(|id| self.songs.get(&id))
+            .map(|song| TrackSummary {
+                track_no: song._track_no,
+                title: song._title.clone(),
+                duration: song._duration,
+            })
+            .collect();
+
+        Some(AlbumSummary {
+            title: album._title.clone(),
+            album_artist: album._album_artist.clone(),
+            year: album._year.filter(|y| *y != 0),
+            total_duration: tracks
+                .iter()
+                .filter_map(|t| t.duration)
+                .reduce(|a, b| a + b),
+            tracks,
+        })
+    }
+}
